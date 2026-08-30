@@ -164,7 +164,13 @@
         const amount = Number(row.Kwota) || 0;
         
         // Odczyt flagi płatności ($Czy_zaplacono)
-        const isPaid = row._Czy_zaplacono ?? row['$Czy_zaplacono'] ?? false;
+        const isPaid = Boolean(
+          row.Czy_zaplacono || 
+          row._Czy_zaplacono || 
+          row['$Czy_zaplacono'] || 
+          row['Czy zaplacono'] ||
+          row.CzyZaplacono
+        );
 
         sumHours += hours;
         sumAmount += amount;
