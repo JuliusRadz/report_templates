@@ -35,14 +35,12 @@
       width: 100%;
       border-collapse: collapse;
       margin-top: 15px;
-      table-layout: fixed;
     }
     th, td {
       border: 1px solid #ccc;
       padding: 8px 10px;
       text-align: left;
       font-size: 13px;
-      word-wrap: break-word;
     }
     th {
       background-color: #f2f2f2;
@@ -54,6 +52,13 @@
     }
     .col-center { text-align: center; }
     .col-right { text-align: right; }
+
+    /* Maksymalne zwężenie kolumn technicznych do szerokości ich tekstu */
+    .col-fit {
+      width: 1%;
+      white-space: nowrap;
+    }
+
     .print-btn {
       padding: 9px 16px;
       background: #0b57d0;
@@ -89,9 +94,9 @@
   <table>
     <thead>
       <tr>
-        <th style="width: 40px;" class="col-center">Lp.</th>
-        <th style="width: 135px;">Termin</th>
-        <th style="width: 65px;" class="col-center">Godz.</th>
+        <th class="col-fit col-center">Lp.</th>
+        <th class="col-fit">Termin</th>
+        <th class="col-fit col-center">Godz.</th>
         <th>Temat / Notatki</th>
       </tr>
     </thead>
@@ -101,7 +106,7 @@
     <tfoot>
       <tr>
         <td colspan="2" class="col-right">Łącznie:</td>
-        <td class="col-center" id="totalHours">0 h</td>
+        <td class="col-fit col-center" id="totalHours">0 h</td>
         <td></td>
       </tr>
     </tfoot>
@@ -170,9 +175,9 @@
 
         rowsHtml += `
           <tr>
-            <td class="col-center">${index + 1}</td>
-            <td>${formatGristDate(start)}</td>
-            <td class="col-center">${hours}</td>
+            <td class="col-fit col-center">${index + 1}</td>
+            <td class="col-fit">${formatGristDate(start)}</td>
+            <td class="col-fit col-center">${hours}</td>
             <td>${String(notes).replace(/\n/g, '<br>')}</td>
           </tr>
         `;
