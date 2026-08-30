@@ -3,53 +3,77 @@
 <head>
   <meta charset="UTF-8">
   <title>Raport Lekcji</title>
-  <!-- Oficjalna biblioteka Grist Plugin API -->
   <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
-      color: #222;
-      background-color: #fff;
+      color: #1a1a1a;
+      background: #fff;
     }
     .header {
-      border-bottom: 2px solid #333;
-      padding-bottom: 10px;
+      border-bottom: 2px solid #2b2b2b;
+      padding-bottom: 12px;
       margin-bottom: 20px;
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
     }
-    h1 { margin: 0; font-size: 22px; }
-    .student-info { font-size: 14px; margin-top: 5px; }
+    h1 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+    .student-name {
+      font-size: 16px;
+      color: #333;
+    }
+    .gen-date {
+      font-size: 12px;
+      color: #666;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
       margin-top: 15px;
     }
     th, td {
-      border: 1px solid #ddd;
+      border: 1px solid #ccc;
       padding: 8px 10px;
       text-align: left;
       font-size: 13px;
     }
     th {
-      background-color: #f4f4f4;
+      background-color: #f2f2f2;
       font-weight: bold;
     }
+    tfoot td {
+      font-weight: bold;
+      background-color: #fafafa;
+    }
+    .col-center { text-align: center; }
+    .col-right { text-align: right; }
+    .status-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+    .badge-paid { background: #e6f4ea; color: #137333; }
+    .badge-unpaid { background: #fce8e6; color: #c5221f; }
     .print-btn {
-      padding: 8px 14px;
-      background: #1a73e8;
+      padding: 9px 16px;
+      background: #0b57d0;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
       font-weight: bold;
+      font-size: 13px;
       margin-bottom: 15px;
     }
-    .print-btn:hover { background: #1557b0; }
+    .print-btn:hover { background: #0842a0; }
 
-    /* Ukrycie przycisku i marginesy podczas druku do PDF */
     @media print {
       .print-btn { display: none; }
       body { margin: 0; padding: 10mm; }
@@ -63,66 +87,106 @@
 
   <div class="header">
     <div>
-      <h1>Raport zrealizowanych lekcji</h1>
-      <div class="student-info" id="studentName">Wybierz ucznia...</div>
+      <h1>Podsumowanie zrealizowanych lekcji</h1>
+      <div class="student-name" id="studentHeader">Uczeń: —</div>
     </div>
-    <div id="reportDate" style="font-size: 12px; color: #666;"></div>
+    <div class="gen-date" id="reportDate"></div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th style="width: 90px;">Data</th>
-        <th style="width: 160px;">Temat</th>
-        <th>Notatki / Przebieg zajęć</th>
-        <th style="width: 70px;">Czas</th>
+        <th style="width: 130px;">Termin</th>
+        <th style="width: 60px;" class="col-center">Godz.</th>
+        <th>Temat / Notatki</th>
+        <th style="width: 80px;" class="col-right">Kwota</th>
+        <th style="width: 85px;" class="col-center">Status</th>
       </tr>
     </thead>
-    <tbody id="lessonsBody">
-      <tr><td colspan="4">Brak lekcji do wyświetlenia.</td></tr>
+    <tbody id="tableBody">
+      <tr><td colspan="5" class="col-center">Wybierz ucznia lub włącz filtr w tabeli Lekcje.</td></tr>
     </tbody>
+    <tfoot>
+      <tr>
+        <td class="col-right">Łącznie:</td>
+        <td class="col-center" id="totalHours">0 h</td>
+        <td></td>
+        <td class="col-right" id="totalAmount">0,00 zł</td>
+        <td></td>
+      </tr>
+    </tfoot>
   </table>
 
   <script>
-    // Inicjalizacja z uprawnieniem do czytania tabel
     grist.ready({ requiredAccess: 'read table' });
 
-    // Nasłuchiwanie na rekordy przekazane do widgetu
-    grist.onRecords((records) => {
-      const tbody = document.getElementById('lessonsBody');
-      const studentNameElem = document.getElementById('studentName');
-      document.getElementById('reportDate').textContent = `Wygenerowano: ${new Date().toLocaleDateString('pl-PL')}`;
+    function formatGristDate(val) {
+      if (!val) return '—';
+      const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
+      if (isNaN(d.getTime())) return val;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}.${month}.${year} ${hours}:${mins}`;
+    }
+
+    grist.onRecords((records, mappings) => {
+      const tbody = document.getElementById('tableBody');
+      const studentElem = document.getElementById('studentHeader');
+      const totalHoursElem = document.getElementById('totalHours');
+      const totalAmountElem = document.getElementById('totalAmount');
+
+      document.getElementById('reportDate').textContent = `Data: ${new Date().toLocaleDateString('pl-PL')}`;
 
       if (!records || records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4">Brak lekcji w bieżącym widoku.</td></tr>';
-        studentNameElem.textContent = 'Brak danych';
+        tbody.innerHTML = '<tr><td colspan="5" class="col-center">Brak lekcji do wyświetlenia.</td></tr>';
+        studentElem.innerHTML = 'Uczeń: —';
+        totalHoursElem.textContent = '0 h';
+        totalAmountElem.textContent = '0,00 zł';
         return;
       }
 
-      // Nazwa ucznia pobrana z pierwszego rekordu
-      const firstRow = records[0];
-      studentNameElem.innerHTML = `<strong>Uczeń:</strong> ${firstRow.Uczen || firstRow.Uczeń || '—'}`;
+      // Nazwa ucznia z pierwszego rekordu
+      const rawStudent = records[0].Imie_i_nazwisko || records[0]['Imie i nazwisko'] || '—';
+      studentElem.innerHTML = `<strong>Uczeń:</strong> ${rawStudent}`;
 
-      // Budowanie wierszy tabeli (nazwy pól muszą odpowiadać kolumnom w tabeli Lekcje)
       let rowsHtml = '';
+      let sumHours = 0;
+      let sumAmount = 0;
+
       records.forEach(row => {
-        let dateVal = row.Data;
-        if (typeof dateVal === 'number') {
-          // Konwersja timestampu unixowego z Grist
-          dateVal = new Date(dateVal * 1000).toLocaleDateString('pl-PL');
-        }
+        // Grist ID kolumn: spacje i znaki specjalne są zastępowane podkreślnikami
+        const start = row.Data_rozpoczecia || row['Data rozpoczęcia'];
+        const notes = row.Notatki || '—';
+        const hours = Number(row.Godzin) || 0;
+        const amount = Number(row.Kwota) || 0;
+        
+        // Odczyt flagi płatności ($Czy_zaplacono)
+        const isPaid = row._Czy_zaplacono ?? row['$Czy_zaplacono'] ?? false;
+
+        sumHours += hours;
+        sumAmount += amount;
+
+        const badgeHtml = isPaid 
+          ? '<span class="status-badge badge-paid">Opłacono</span>' 
+          : '<span class="status-badge badge-unpaid">Do zapłaty</span>';
 
         rowsHtml += `
           <tr>
-            <td>${dateVal || '—'}</td>
-            <td><strong>${row.Temat || '—'}</strong></td>
-            <td>${(row.Notatki || '').replace(/\n/g, '<br>')}</td>
-            <td>${row.Czas || row.Czas_trwania || '—'}</td>
+            <td>${formatGristDate(start)}</td>
+            <td class="col-center">${hours}</td>
+            <td>${String(notes).replace(/\n/g, '<br>')}</td>
+            <td class="col-right">${amount.toFixed(2)} zł</td>
+            <td class="col-center">${badgeHtml}</td>
           </tr>
         `;
       });
 
       tbody.innerHTML = rowsHtml;
+      totalHoursElem.textContent = `${sumHours} h`;
+      totalAmountElem.textContent = `${sumAmount.toFixed(2)} zł`;
     });
   </script>
 </body>
