@@ -309,6 +309,7 @@
     return isNaN(d.getTime()) ? null : d;
   }
 
+  // Pobranie nazwisk uczniów
   async function loadStudents() {
     try {
       const uData = await grist.docApi.fetchTable('Uczniowie');
@@ -343,32 +344,6 @@
     renderDashboard();
   }
 
-  // Funkcja bezpiecznie wyciągająca typ płatności bez względu na format klucza i wartości
-  function extractPaymentType(row) {
-    let rawVal = null;
-    
-    // Szukamy klucza zawierającego 'platn' lub 'p_atn'
-    for (const key of Object.keys(row)) {
-      const lowerKey = key.toLowerCase();
-      if (lowerKey.includes('platn') || lowerKey.includes('p_atn') || lowerKey.includes('płatn')) {
-        rawVal = row[key];
-        break;
-      }
-    }
-
-    if (rawVal === null || rawVal === undefined) return 'nieokreslono';
-
-    // Obsługa ID z tabeli Poziom (1 = Gotówka, 2 = Przelew)
-    if (rawVal === 1 || rawVal === '1') return 'gotowka';
-    if (rawVal === 2 || rawVal === '2') return 'przelew';
-
-    const textVal = String(rawVal).toLowerCase().trim();
-    if (textVal.includes('przel')) return 'przelew';
-    if (textVal.includes('got')) return 'gotowka';
-
-    return 'nieokreslono';
-  }
-
   function renderDashboard() {
     const fromVal = document.getElementById('dateFrom').value;
     const toVal = document.getElementById('dateTo').value;
@@ -401,16 +376,11 @@
       const amount = Number(row.Kwota) || 0;
       const hours = Number(row.Godzin) || 0;
 
-      // 3. Status płatności ($Czy_zaplacono)
-      const isPaid = Boolean(
-        row._Czy_zaplacono ||
-        row['$Czy_zaplacono'] ||
-        row.Czy_zaplacono ||
-        row['Czy zaplacono']
-      );
+      // 3. Status opłacenia
+      const isPaid = Boolean(row.Czy_zaplacono || row._Czy_zaplacono || row['$Czy_zaplacono']);
 
-      // 4. Rozpoznany typ płatności
-      const payType = extractPaymentType(row);
+      // 4. Bezpośredni odczyt pola Choice: Typ_platnosci
+      const payType = String(row.Typ_platnosci || row['$Typ_platnosci'] || '').toLowerCase().trim();
 
       totalRevenue += amount;
       totalHours += hours;
@@ -422,9 +392,9 @@
         totalUnpaid += amount;
       }
 
-      if (payType === 'przelew') {
+      if (payType.includes('przelew')) {
         splitTransfer += amount;
-      } else if (payType === 'gotowka') {
+      } else if (payType.includes('gotów') || payType.includes('gotow')) {
         splitCash += amount;
       } else {
         splitOther += amount;
@@ -465,7 +435,7 @@
     document.getElementById('splitCash').textContent = `${splitCash.toFixed(2)} zł`;
     document.getElementById('splitOther').textContent = `${splitOther.toFixed(2)} zł`;
 
-    // Tabela uczniów
+    // Tabela podsumowania uczniów
     const tbody = document.getElementById('summaryBody');
     const studentNames = Object.keys(studentSummary);
 
@@ -489,7 +459,7 @@
       tbody.innerHTML = html;
     }
 
-    // Stopka
+    // Podsumowanie w stopce
     document.getElementById('footLessons').textContent = totalLessonsCount;
     document.getElementById('footHours').textContent = `${totalHours} h`;
     document.getElementById('footTotal').textContent = `${totalRevenue.toFixed(2)} zł`;
