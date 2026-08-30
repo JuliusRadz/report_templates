@@ -42,7 +42,7 @@
       border: 1px solid var(--border);
     }
 
-    /* FullCalendar - motyw ciemny */
+    /* Dopasowanie do ciemnego motywu Grist */
     .fc {
       --fc-border-color: var(--border);
       --fc-page-bg-color: var(--card-bg);
@@ -63,7 +63,7 @@
     .fc-col-header-cell-cushion { color: var(--text-muted); padding: 8px 0; }
     .fc-timegrid-slot-label-cushion { color: var(--text-muted); }
 
-    /* Modal Formularza */
+    /* Modal */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -260,12 +260,22 @@
   grist.ready({ requiredAccess: 'full' });
 
   let calendar;
+  let currentTableId = 'Lekcje'; // domyślnie, nadpisywane dynamicznie
   let activeStudents = [];
   let studentsMap = {};
 
   function toLocalISO(date) {
     const pad = (n) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function parseDateValue(val) {
+    if (!val) return null;
+    if (typeof val === 'number') {
+      return new Date(val > 10000000000 ? val : val * 1000);
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
   }
 
   async function loadStudents() {
@@ -304,6 +314,16 @@
   document.addEventListener('DOMContentLoaded', async () => {
     await loadStudents();
 
+    // Pobranie rzeczywistego ID tabeli z Grist
+    try {
+      const table = grist.getTable();
+      if (table && table.getTableId) {
+        currentTableId = await table.getTableId();
+      }
+    } catch (e) {
+      console.warn('Nie udało się pobrać ID tabeli, używam fallbacku:', currentTableId);
+    }
+
     const calendarEl = document.getElementById('calendar');
     calendar = new FullCalendar.Calendar(calendarEl, {
       locale: 'pl',
@@ -340,12 +360,19 @@
     calendar.render();
   });
 
+  // Reagowanie na dane przesyłane z Grist
   grist.onRecords((records) => {
     if (!calendar) return;
 
-    const events = (records || []).map(row => {
-      const startSec = typeof row.Data_rozpoczecia === 'number' ? row.Data_rozpoczecia : new Date(row.Data_rozpoczecia).getTime() / 1000;
-      const endSec = typeof row.Data_zakonczenia === 'number' ? row.Data_zakonczenia : new Date(row.Data_zakonczenia).getTime() / 1000;
+    const events = [];
+    (records || []).forEach(row => {
+      const rawStart = row.Data_rozpoczecia || row['Data rozpoczęcia'];
+      const rawEnd = row.Data_zakonczenia || row['Data zakończenia'];
+
+      const startDate = parseDateValue(rawStart);
+      const endDate = parseDateValue(rawEnd);
+
+      if (!startDate) return;
 
       const isCompleted = Boolean(row.Zrealizowano);
       const isPaid = Boolean(row.Czy_zaplacono || row._Czy_zaplacono || row['$Czy_zaplacono']);
@@ -355,15 +382,15 @@
       if (isCompleted && isPaid) bgColor = '#1e8e3e';
       else if (isCompleted && !isPaid) bgColor = '#d93025';
 
-      return {
+      events.push({
         id: String(row.id),
         title: `${studentName}${row.Notatki ? ' - ' + row.Notatki : ''}`,
-        start: new Date(startSec * 1000),
-        end: new Date(endSec * 1000),
+        start: startDate,
+        end: endDate || new Date(startDate.getTime() + 3600000),
         backgroundColor: bgColor,
         borderColor: bgColor,
         extendedProps: { raw: row }
-      };
+      });
     });
 
     calendar.removeAllEvents();
@@ -393,7 +420,8 @@
     document.getElementById('modalTitle').textContent = 'Edytuj lekcję';
     document.getElementById('btnDelete').style.display = 'block';
 
-    document.getElementById('studentSelect').value = typeof row.Imie_i_nazwisko === 'object' ? row.Imie_i_nazwisko.id : row.Imie_i_nazwisko;
+    const sVal = row.Imie_i_nazwisko;
+    document.getElementById('studentSelect').value = (typeof sVal === 'object' && sVal !== null) ? sVal.id : (sVal || '');
     document.getElementById('startTime').value = toLocalISO(event.start);
     document.getElementById('endTime').value = toLocalISO(event.end);
     document.getElementById('hoursCount').value = row.Godzin || 1;
@@ -457,9 +485,9 @@
 
     try {
       if (rowId) {
-        await grist.docApi.applyUserActions([['UpdateRecord', 'Lekcje', Number(rowId), recordFields]]);
+        await grist.docApi.applyUserActions([['UpdateRecord', currentTableId, Number(rowId), recordFields]]);
       } else {
-        await grist.docApi.applyUserActions([['AddRecord', 'Lekcje', null, recordFields]]);
+        await grist.docApi.applyUserActions([['AddRecord', currentTableId, null, recordFields]]);
       }
       closeModal();
     } catch (e) {
@@ -473,7 +501,7 @@
 
     if (confirm('Czy na pewno chcesz usunąć tę lekcję?')) {
       try {
-        await grist.docApi.applyUserActions([['RemoveRecord', 'Lekcje', Number(rowId)]]);
+        await grist.docApi.applyUserActions([['RemoveRecord', currentTableId, Number(rowId)]]);
         closeModal();
       } catch (e) {
         alert('Błąd usuwania: ' + e.message);
@@ -488,7 +516,7 @@
     const sId = typeof row.Imie_i_nazwisko === 'object' ? row.Imie_i_nazwisko.id : row.Imie_i_nazwisko;
     const rate = (sId && studentsMap[sId]) ? studentsMap[sId].rate : 100;
 
-    await grist.docApi.applyUserActions([['UpdateRecord', 'Lekcje', Number(event.id), {
+    await grist.docApi.applyUserActions([['UpdateRecord', currentTableId, Number(event.id), {
       Data_rozpoczecia: Math.floor(event.start.getTime() / 1000),
       Data_zakonczenia: Math.floor(event.end.getTime() / 1000),
       Godzin: hours,
