@@ -42,7 +42,7 @@
       border: 1px solid var(--border);
     }
 
-    /* Dopasowanie FullCalendar do ciemnego motywu */
+    /* FullCalendar - motyw ciemny */
     .fc {
       --fc-border-color: var(--border);
       --fc-page-bg-color: var(--card-bg);
@@ -261,15 +261,13 @@
 
   let calendar;
   let activeStudents = [];
-  let studentsMap = {}; // id -> student object
+  let studentsMap = {};
 
-  // Konwersja czasu do formatu inputu datetime-local
   function toLocalISO(date) {
     const pad = (n) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
 
-  // Pobranie aktywnych uczniów
   async function loadStudents() {
     try {
       const tableData = await grist.docApi.fetchTable('Uczniowie');
@@ -303,7 +301,6 @@
     }
   }
 
-  // Inicjalizacja kalendarza
   document.addEventListener('DOMContentLoaded', async () => {
     await loadStudents();
 
@@ -323,22 +320,18 @@
       selectMirror: true,
       editable: true,
 
-      // Kliknięcie i zaznaczenie wolnego slotu
       select: function(info) {
         openModalForNew(info.start, info.end);
       },
 
-      // Kliknięcie w istniejącą lekcję
       eventClick: function(info) {
         openModalForEdit(info.event);
       },
 
-      // Przesuwanie lekcji drag & drop
       eventDrop: async function(info) {
         await updateEventTimes(info.event);
       },
 
-      // Zmiana długości lekcji
       eventResize: async function(info) {
         await updateEventTimes(info.event);
       }
@@ -347,7 +340,6 @@
     calendar.render();
   });
 
-  // Odbieranie wierszy z tabeli LEKCJE w Grist
   grist.onRecords((records) => {
     if (!calendar) return;
 
@@ -359,10 +351,9 @@
       const isPaid = Boolean(row.Czy_zaplacono || row._Czy_zaplacono || row['$Czy_zaplacono']);
       const studentName = row.Imie_i_nazwisko_text || row.Imie_i_nazwisko || 'Lekcja';
 
-      // Kolory statusów
-      let bgColor = '#5f6368'; // Szary = zaplanowana
-      if (isCompleted && isPaid) bgColor = '#1e8e3e'; // Zielony = zrealizowana i opłacona
-      else if (isCompleted && !isPaid) bgColor = '#d93025'; // Czerwony = zrealizowana, do zapłaty
+      let bgColor = '#5f6368';
+      if (isCompleted && isPaid) bgColor = '#1e8e3e';
+      else if (isCompleted && !isPaid) bgColor = '#d93025';
 
       return {
         id: String(row.id),
@@ -379,7 +370,6 @@
     calendar.addEventSource(events);
   });
 
-  // Obsługa okna modalnego
   function openModalForNew(start, end) {
     document.getElementById('editRowId').value = '';
     document.getElementById('modalTitle').textContent = 'Zaplanuj lekcję';
@@ -420,7 +410,6 @@
     document.getElementById('eventModal').classList.remove('active');
   }
 
-  // Automatyczne przeliczanie
   function onStudentChange() {
     recalculateAmount();
   }
@@ -442,7 +431,6 @@
     document.getElementById('totalAmount').value = Math.round(hours * rate);
   }
 
-  // Zapis do bazy Grist przez API
   async function saveLesson() {
     const rowId = document.getElementById('editRowId').value;
     const studentId = Number(document.getElementById('studentSelect').value);
@@ -469,11 +457,9 @@
 
     try {
       if (rowId) {
-        // Aktualizacja rekordu
-        await grist.docApi.applyUserActions([['UpdateRecord', 'LEKCJE', Number(rowId), recordFields]]);
+        await grist.docApi.applyUserActions([['UpdateRecord', 'Lekcje', Number(rowId), recordFields]]);
       } else {
-        // Dodanie nowego rekordu
-        await grist.docApi.applyUserActions([['AddRecord', 'LEKCJE', null, recordFields]]);
+        await grist.docApi.applyUserActions([['AddRecord', 'Lekcje', null, recordFields]]);
       }
       closeModal();
     } catch (e) {
@@ -481,14 +467,13 @@
     }
   }
 
-  // Usunięcie lekcji
   async function deleteLesson() {
     const rowId = document.getElementById('editRowId').value;
     if (!rowId) return;
 
     if (confirm('Czy na pewno chcesz usunąć tę lekcję?')) {
       try {
-        await grist.docApi.applyUserActions([['RemoveRecord', 'LEKCJE', Number(rowId)]]);
+        await grist.docApi.applyUserActions([['RemoveRecord', 'Lekcje', Number(rowId)]]);
         closeModal();
       } catch (e) {
         alert('Błąd usuwania: ' + e.message);
@@ -496,7 +481,6 @@
     }
   }
 
-  // Aktualizacja po przesunięciu kafelka w kalendarzu
   async function updateEventTimes(event) {
     const diffHours = (event.end - event.start) / (1000 * 60 * 60);
     const hours = Math.round(diffHours * 10) / 10;
@@ -504,7 +488,7 @@
     const sId = typeof row.Imie_i_nazwisko === 'object' ? row.Imie_i_nazwisko.id : row.Imie_i_nazwisko;
     const rate = (sId && studentsMap[sId]) ? studentsMap[sId].rate : 100;
 
-    await grist.docApi.applyUserActions([['UpdateRecord', 'LEKCJE', Number(event.id), {
+    await grist.docApi.applyUserActions([['UpdateRecord', 'Lekcje', Number(event.id), {
       Data_rozpoczecia: Math.floor(event.start.getTime() / 1000),
       Data_zakonczenia: Math.floor(event.end.getTime() / 1000),
       Godzin: hours,
