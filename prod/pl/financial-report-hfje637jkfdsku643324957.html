@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Finansowy</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --border: #e0e0e0;
+      --text: #202124;
+      --text-muted: #5f6368;
+      --success: #1e8e3e;
+      --danger: #d93025;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    /* Pasek górny z filtrami */
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-bg);
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .filter-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type="date"] {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .btn {
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-secondary { background: #e8eaed; color: var(--text); }
+    .btn-secondary:hover { background: #dadce0; }
+
+    /* Karty KPI */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      background: var(--border);
+    }
+
+    .kpi-card.kpi-hours::before { background: #f9ab00; }
+    .kpi-card.kpi-total::before { background: var(--primary); }
+    .kpi-card.kpi-paid::before { background: var(--success); }
+    .kpi-card.kpi-unpaid::before { background: var(--danger); }
+
+    .kpi-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Pasek podziału płatności */
+    .split-card {
+      background: var(--card-bg);
+      padding: 14px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 15px;
+      font-size: 13px;
+    }
+
+    .split-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .split-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Tabela */
+    .table-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    tfoot td {
+      font-weight: 700;
+      background-color: #fafafa;
+    }
+
+    .col-right { text-align: right; }
+    .col-center { text-align: center; }
+
+    .text-success { color: var(--success); font-weight: 600; }
+    .text-danger { color: var(--danger); font-weight: 600; }
+
+    @media print {
+  body { background: #fff; padding: 0; }
+  .controls { display: none !important; }
+  .kpi-card, .table-card, .split-card { box-shadow: none; border-color: #ccc; }
+  @page { size: A4 landscape; margin: 10mm; }
+}
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Pasek filtrów -->
+  <div class="controls">
+    <button class="btn btn-primary" onclick="window.print()">Drukuj / Zapisz PDF</button>
+    <div class="filter-group">
+      <label>Od: <input type="date" id="dateFrom" onchange="renderDashboard()"></label>
+      <label>Do: <input type="date" id="dateTo" onchange="renderDashboard()"></label>
+      <button class="btn btn-secondary" onclick="setThisMonth()">Bieżący miesiąc</button>
+      <button class="btn btn-secondary" onclick="clearFilters()">Wyczyść</button>
+    </div>
+  </div>
+
+  <!-- Karty KPI -->
+  <div class="kpi-grid">
+    <!-- 1. Przepracowane godziny -->
+    <div class="kpi-card kpi-hours">
+      <div class="kpi-title">Przepracowane</div>
+      <div class="kpi-value" id="kpiHours">0 h</div>
+      <div class="kpi-sub" id="kpiLessonsCount">0 lekcji</div>
+    </div>
+
+    <!-- 2. Przychód łączny -->
+    <div class="kpi-card kpi-total">
+      <div class="kpi-title">Przychód łączny</div>
+      <div class="kpi-value" id="kpiTotal">0,00 zł</div>
+      <div class="kpi-sub">ze zrealizowanych lekcji</div>
+    </div>
+
+    <!-- 3. Opłacone -->
+    <div class="kpi-card kpi-paid">
+      <div class="kpi-title">Opłacone</div>
+      <div class="kpi-value text-success" id="kpiPaid">0,00 zł</div>
+      <div class="kpi-sub" id="kpiPaidPct">0% przychodu</div>
+    </div>
+
+    <!-- 4. Do zapłaty -->
+    <div class="kpi-card kpi-unpaid">
+      <div class="kpi-title">Do zapłaty</div>
+      <div class="kpi-value text-danger" id="kpiUnpaid">0,00 zł</div>
+      <div class="kpi-sub" id="kpiUnpaidPct">0% zaległości</div>
+    </div>
+  </div>
+
+  <!-- Podział metod płatności -->
+  <div class="split-card">
+    <div class="split-item">
+      <div class="split-dot" style="background: #1a73e8;"></div>
+      <span>Przelew: <strong id="splitTransfer">0,00 zł</strong></span>
+    </div>
+    <div class="split-item">
+      <div class="split-dot" style="background: #34a853;"></div>
+      <span>Gotówka: <strong id="splitCash">0,00 zł</strong></span>
+    </div>
+    <div class="split-item">
+      <div class="split-dot" style="background: #80868b;"></div>
+      <span>Nieokreślono: <strong id="splitOther">0,00 zł</strong></span>
+    </div>
+  </div>
+
+  <!-- Zestawienie wg uczniów -->
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>Uczeń</th>
+          <th class="col-center">Lekcje</th>
+          <th class="col-center">Godziny</th>
+          <th class="col-right">Przychód</th>
+          <th class="col-right">Opłacono</th>
+          <th class="col-right">Zaległość</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody">
+        <tr><td colspan="6" class="col-center">Ładowanie danych...</td></tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Podsumowanie:</td>
+          <td class="col-center" id="footLessons">0</td>
+          <td class="col-center" id="footHours">0 h</td>
+          <td class="col-right" id="footTotal">0,00 zł</td>
+          <td class="col-right text-success" id="footPaid">0,00 zł</td>
+          <td class="col-right text-danger" id="footUnpaid">0,00 zł</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  grist['\u0072\u0065\u0061\u0064\u0079']({'\u0072\u0065\u0071\u0075\u0069\u0072\u0065\u0064\u0041\u0063\u0063\u0065\u0073\u0073':'read table'});var _0x_0x27c=(920034^920034)+(375438^375436);let allLessons=[];_0x_0x27c='\u0062\u0064\u006E\u0064\u0061\u006A';function parseDate(val){if(!val)return null;const d=typeof val==="\u006E\u0075\u006D\u0062\u0065\u0072"?new Date(val*(603451^603859)):new Date(val);return isNaN(d['\u0067\u0065\u0074\u0054\u0069\u006D\u0065']())?null:d;}function setThisMonth(){const _0x738c3c=new Date();var _0x52f8ac=(153481^153483)+(236994^236998);const _0x274e=new Date(_0x738c3c['\u0067\u0065\u0074\u0046\u0075\u006C\u006C\u0059\u0065\u0061\u0072'](),_0x738c3c['\u0067\u0065\u0074\u004D\u006F\u006E\u0074\u0068'](),806556^806557);_0x52f8ac=620214^620211;const _0x21136d=new Date(_0x738c3c['\u0067\u0065\u0074\u0046\u0075\u006C\u006C\u0059\u0065\u0061\u0072'](),_0x738c3c['\u0067\u0065\u0074\u004D\u006F\u006E\u0074\u0068']()+(820415^820414),391132^391132);const _0xde188f=n=>String(n)['\u0070\u0061\u0064\u0053\u0074\u0061\u0072\u0074'](384105^384107,"\u0030");document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0046\u0072\u006F\u006D")['\u0076\u0061\u006C\u0075\u0065']=`${_0x274e['\u0067\u0065\u0074\u0046\u0075\u006C\u006C\u0059\u0065\u0061\u0072']()}-${_0xde188f(_0x274e['\u0067\u0065\u0074\u004D\u006F\u006E\u0074\u0068']()+(912733^912732))}-01`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0054\u006F")['\u0076\u0061\u006C\u0075\u0065']=`${_0x21136d['\u0067\u0065\u0074\u0046\u0075\u006C\u006C\u0059\u0065\u0061\u0072']()}-${_0xde188f(_0x21136d['\u0067\u0065\u0074\u004D\u006F\u006E\u0074\u0068']()+(527329^527328))}-${_0xde188f(_0x21136d['\u0067\u0065\u0074\u0044\u0061\u0074\u0065']())}`;renderDashboard();}function clearFilters(){document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0046\u0072\u006F\u006D")['\u0076\u0061\u006C\u0075\u0065']='';document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0054\u006F")['\u0076\u0061\u006C\u0075\u0065']='';renderDashboard();}function renderDashboard(_0x78ffe,_0x2_0xdae,_0xb64e,_0x5gffb,_0x6egd3c,_0xf37ada,_0xae_0xe0f,_0x251c,_0x4fbfg,_0x93f){var _0x39c3f=(789639^789639)+(815073^815075);const _0xb0b6fd=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0046\u0072\u006F\u006D")['\u0076\u0061\u006C\u0075\u0065'];_0x39c3f="fiqeef".split("").reverse().join("");var _0xa092d=(300415^300415)+(219840^219847);const _0x3_0x484=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("oTetad".split("").reverse().join(""))['\u0076\u0061\u006C\u0075\u0065'];_0xa092d=(813466^813468)+(894957^894952);const _0x97564c=_0xb0b6fd?new Date(_0xb0b6fd+"\u0054\u0030\u0030\u003A\u0030\u0030\u003A\u0030\u0030"):null;_0x78ffe=(411113^411116)+(578775^578769);const _0xbf3f=_0x3_0x484?new Date(_0x3_0x484+"95:95:32T".split("").reverse().join("")):null;_0x2_0xdae=996667^996659;_0xb64e=760868^760868;_0x5gffb=670998^670998;var _0x7d28ce=(603992^603985)+(537183^537182);_0x6egd3c=700557^700557;_0x7d28ce=(764374^764375)+(890849^890857);_0xf37ada=843967^843967;_0xae_0xe0f=698774^698774;var _0x8e84c=(731108^731109)+(525334^525331);_0x251c=385551^385551;_0x8e84c="kbliea".split("").reverse().join("");_0x4fbfg=482550^482550;var _0x4b8d3b=(608621^608620)+(798740^798742);_0x93f=796514^796514;_0x4b8d3b=(380889^380894)+(893288^893293);const _0x19g={};allLessons['\u0066\u006F\u0072\u0045\u0061\u0063\u0068'](row=>{if(!row['\u005A\u0072\u0065\u0061\u006C\u0069\u007A\u006F\u0077\u0061\u006E\u006F'])return;var _0xd_0xf6d=(275557^275556)+(446420^446417);const d=parseDate(row['\u0044\u0061\u0074\u0061\u005F\u0072\u006F\u007A\u0070\u006F\u0063\u007A\u0065\u0063\u0069\u0061']||row["\u0044\u0061\u0074\u0061\u0020\u0072\u006F\u007A\u0070\u006F\u0063\u007A\u0119\u0063\u0069\u0061"]);_0xd_0xf6d=(739032^739038)+(824513^824517);if(d){if(_0x97564c&&d<_0x97564c)return;if(_0xbf3f&&d>_0xbf3f)return;}const _0xcb_0x690=Number(row['\u004B\u0077\u006F\u0074\u0061'])||505401^505401;var _0x7ca=(720369^720368)+(664111^664110);const _0xb386db=Number(row['\u0047\u006F\u0064\u007A\u0069\u006E'])||262900^262900;_0x7ca=(910204^910197)+(622372^622368);var _0x3d5c=(695856^695859)+(377233^377235);const _0x4_0x987=Boolean(row['\u0043\u007A\u0079\u005F\u007A\u0061\u0070\u006C\u0061\u0063\u006F\u006E\u006F']||row['\u005F\u0043\u007A\u0079\u005F\u007A\u0061\u0070\u006C\u0061\u0063\u006F\u006E\u006F']||row['$Czy_zaplacono']);_0x3d5c=708661^708658;const _0xd270c=String(row['\u0054\u0079\u0070\u005F\u0070\u006C\u0061\u0074\u006E\u006F\u0073\u0063\u0069']||row["\u0024\u0054\u0079\u0070\u005F\u0070\u006C\u0061\u0074\u006E\u006F\u0073\u0063\u0069"]||'')['\u0074\u006F\u004C\u006F\u0077\u0065\u0072\u0043\u0061\u0073\u0065']()['\u0074\u0072\u0069\u006D']();_0xb64e+=_0xcb_0x690;_0xf37ada+=_0xb386db;_0xae_0xe0f++;if(_0x4_0x987){_0x5gffb+=_0xcb_0x690;}else{_0x6egd3c+=_0xcb_0x690;}if(_0xd270c['\u0069\u006E\u0063\u006C\u0075\u0064\u0065\u0073']("\u0070\u0072\u007A\u0065\u006C\u0065\u0077")){_0x251c+=_0xcb_0x690;}else if(_0xd270c['\u0069\u006E\u0063\u006C\u0075\u0064\u0065\u0073']("w\xF3tog".split("").reverse().join(""))||_0xd270c['\u0069\u006E\u0063\u006C\u0075\u0064\u0065\u0073']("wotog".split("").reverse().join(""))){_0x4fbfg+=_0xcb_0x690;}else{_0x93f+=_0xcb_0x690;}let _0x1985fb;const _0x22a2g=row['\u0049\u006D\u0069\u0065\u005F\u0069\u005F\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F\u005F\u0074\u0065\u0078\u0074']||row['\u0049\u006D\u0069\u0065\u005F\u0069\u005F\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F']||"\u004E\u0069\u0065\u0070\u0072\u007A\u0079\u0070\u0069\u0073\u0061\u006E\u0079";_0x1985fb=(619101^619092)+(742263^742263);if(!_0x19g[_0x22a2g]){_0x19g[_0x22a2g]={'\u006C\u0065\u0073\u0073\u006F\u006E\u0073':0,"hours":0,"revenue":0,'\u0070\u0061\u0069\u0064':0,"unpaid":0};}_0x19g[_0x22a2g]['\u006C\u0065\u0073\u0073\u006F\u006E\u0073']+=186680^186681;_0x19g[_0x22a2g]['\u0068\u006F\u0075\u0072\u0073']+=_0xb386db;_0x19g[_0x22a2g]['\u0072\u0065\u0076\u0065\u006E\u0075\u0065']+=_0xcb_0x690;if(_0x4_0x987){_0x19g[_0x22a2g]['\u0070\u0061\u0069\u0064']+=_0xcb_0x690;}else{_0x19g[_0x22a2g]['\u0075\u006E\u0070\u0061\u0069\u0064']+=_0xcb_0x690;}});document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("sruoHipk".split("").reverse().join(""))['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xf37ada} h`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u006B\u0070\u0069\u004C\u0065\u0073\u0073\u006F\u006E\u0073\u0043\u006F\u0075\u006E\u0074")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xae_0xe0f} lekcji`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("latoTipk".split("").reverse().join(""))['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xb64e['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](205769^205771)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u006B\u0070\u0069\u0050\u0061\u0069\u0064")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x5gffb['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](940439^940437)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u006B\u0070\u0069\u0055\u006E\u0070\u0061\u0069\u0064")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x6egd3c['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](505853^505855)} zł`;const _0x67a8a=_0xb64e>(849575^849575)?Math['\u0072\u006F\u0075\u006E\u0064'](_0x5gffb/_0xb64e*(686507^686543)):917113^917113;var _0x76aaf=(648077^648077)+(465283^465285);const _0xg726c=_0xb64e>(223024^223024)?Math['\u0072\u006F\u0075\u006E\u0064'](_0x6egd3c/_0xb64e*(711932^711832)):276876^276876;_0x76aaf=(114694^114692)+(619154^619163);document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u006B\u0070\u0069\u0050\u0061\u0069\u0064\u0050\u0063\u0074")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x67a8a}% przychodu`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u006B\u0070\u0069\u0055\u006E\u0070\u0061\u0069\u0064\u0050\u0063\u0074")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xg726c}% zaległości`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0073\u0070\u006C\u0069\u0074\u0054\u0072\u0061\u006E\u0073\u0066\u0065\u0072")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x251c['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](199253^199255)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0073\u0070\u006C\u0069\u0074\u0043\u0061\u0073\u0068")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x4fbfg['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](469495^469493)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0073\u0070\u006C\u0069\u0074\u004F\u0074\u0068\u0065\u0072")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x93f['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](685582^685580)} zł`;const _0x448aaf=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0073\u0075\u006D\u006D\u0061\u0072\u0079\u0042\u006F\u0064\u0079");var _0x8a_0x2g2=(857862^857870)+(843696^843702);const _0x2f_0x375=Object['\u006B\u0065\u0079\u0073'](_0x19g);_0x8a_0x2g2=(824528^824534)+(602103^602101);if(_0x2f_0x375['\u006C\u0065\u006E\u0067\u0074\u0068']===(222158^222158)){_0x448aaf['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']="\u003C\u0074\u0072\u003E\u003C\u0074\u0064\u0020\u0063\u006F\u006C\u0073\u0070\u0061\u006E\u003D\u0022\u0036\u0022\u0020\u0063\u006C\u0061\u0073\u0073\u003D\u0022\u0063\u006F\u006C\u002D\u0063\u0065\u006E\u0074\u0065\u0072\u0022\u003E\u0042\u0072\u0061\u006B\u0020\u007A\u0072\u0065\u0061\u006C\u0069\u007A\u006F\u0077\u0061\u006E\u0079\u0063\u0068\u0020\u006C\u0065\u006B\u0063\u006A\u0069\u0020\u0077\u0020\u0077\u0079\u0062\u0072\u0061\u006E\u0079\u006D\u0020\u006F\u006B\u0072\u0065\u0073\u0069\u0065\u002E\u003C\u002F\u0074\u0064\u003E\u003C\u002F\u0074\u0072\u003E";}else{let _0xef1be='';_0x2f_0x375['\u0073\u006F\u0072\u0074']()['\u0066\u006F\u0072\u0045\u0061\u0063\u0068'](name=>{var _0xad9aba=(924198^924197)+(176556^176556);const s=_0x19g[name];_0xad9aba=(849598^849592)+(842889^842895);_0xef1be+=`
+          <tr>
+            <td><strong>${name}</strong></td>
+            <td class="col-center">${s['\u006C\u0065\u0073\u0073\u006F\u006E\u0073']}</td>
+            <td class="col-center">${s['\u0068\u006F\u0075\u0072\u0073']} h</td>
+            <td class="col-right">${s['\u0072\u0065\u0076\u0065\u006E\u0075\u0065']['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](497637^497639)} zł</td>
+            <td class="col-right text-success">${s['\u0070\u0061\u0069\u0064']['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](595523^595521)} zł</td>
+            <td class="col-right ${s['\u0075\u006E\u0070\u0061\u0069\u0064']>(131340^131340)?"\u0074\u0065\u0078\u0074\u002D\u0064\u0061\u006E\u0067\u0065\u0072":''}">${s['\u0075\u006E\u0070\u0061\u0069\u0064']['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](200702^200700)} zł</td>
+          </tr>
+        `;});_0x448aaf['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']=_0xef1be;}document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0066\u006F\u006F\u0074\u004C\u0065\u0073\u0073\u006F\u006E\u0073")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=_0xae_0xe0f;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0066\u006F\u006F\u0074\u0048\u006F\u0075\u0072\u0073")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xf37ada} h`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("latoTtoof".split("").reverse().join(""))['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0xb64e['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](818520^818522)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0066\u006F\u006F\u0074\u0050\u0061\u0069\u0064")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x5gffb['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](187340^187342)} zł`;document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("diapnUtoof".split("").reverse().join(""))['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x6egd3c['\u0074\u006F\u0046\u0069\u0078\u0065\u0064'](832696^832698)} zł`;}grist['\u006F\u006E\u0052\u0065\u0063\u006F\u0072\u0064\u0073'](records=>{allLessons=records||[];renderDashboard();});
+</script>
+</body>
+</html>
