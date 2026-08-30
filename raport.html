@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Raport Lekcji</title>
+  <!-- Oficjalna biblioteka Grist Plugin API -->
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      color: #222;
+      background-color: #fff;
+    }
+    .header {
+      border-bottom: 2px solid #333;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    h1 { margin: 0; font-size: 22px; }
+    .student-info { font-size: 14px; margin-top: 5px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background-color: #f4f4f4;
+      font-weight: bold;
+    }
+    .print-btn {
+      padding: 8px 14px;
+      background: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+    .print-btn:hover { background: #1557b0; }
+
+    /* Ukrycie przycisku i marginesy podczas druku do PDF */
+    @media print {
+      .print-btn { display: none; }
+      body { margin: 0; padding: 10mm; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-btn" onclick="window.print()">Drukuj / Zapisz jako PDF</button>
+
+  <div class="header">
+    <div>
+      <h1>Raport zrealizowanych lekcji</h1>
+      <div class="student-info" id="studentName">Wybierz ucznia...</div>
+    </div>
+    <div id="reportDate" style="font-size: 12px; color: #666;"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 90px;">Data</th>
+        <th style="width: 160px;">Temat</th>
+        <th>Notatki / Przebieg zajęć</th>
+        <th style="width: 70px;">Czas</th>
+      </tr>
+    </thead>
+    <tbody id="lessonsBody">
+      <tr><td colspan="4">Brak lekcji do wyświetlenia.</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    // Inicjalizacja z uprawnieniem do czytania tabel
+    grist.ready({ requiredAccess: 'read table' });
+
+    // Nasłuchiwanie na rekordy przekazane do widgetu
+    grist.onRecords((records) => {
+      const tbody = document.getElementById('lessonsBody');
+      const studentNameElem = document.getElementById('studentName');
+      document.getElementById('reportDate').textContent = `Wygenerowano: ${new Date().toLocaleDateString('pl-PL')}`;
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4">Brak lekcji w bieżącym widoku.</td></tr>';
+        studentNameElem.textContent = 'Brak danych';
+        return;
+      }
+
+      // Nazwa ucznia pobrana z pierwszego rekordu
+      const firstRow = records[0];
+      studentNameElem.innerHTML = `<strong>Uczeń:</strong> ${firstRow.Uczen || firstRow.Uczeń || '—'}`;
+
+      // Budowanie wierszy tabeli (nazwy pól muszą odpowiadać kolumnom w tabeli Lekcje)
+      let rowsHtml = '';
+      records.forEach(row => {
+        let dateVal = row.Data;
+        if (typeof dateVal === 'number') {
+          // Konwersja timestampu unixowego z Grist
+          dateVal = new Date(dateVal * 1000).toLocaleDateString('pl-PL');
+        }
+
+        rowsHtml += `
+          <tr>
+            <td>${dateVal || '—'}</td>
+            <td><strong>${row.Temat || '—'}</strong></td>
+            <td>${(row.Notatki || '').replace(/\n/g, '<br>')}</td>
+            <td>${row.Czas || row.Czas_trwania || '—'}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml;
+    });
+  </script>
+</body>
+</html>
