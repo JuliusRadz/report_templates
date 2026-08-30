@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raport Lekcji</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      background: #f8f9fa;
+      padding: 10px 14px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .controls label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #444;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .controls input[type="date"] {
+      padding: 5px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .reset-btn {
+      padding: 6px 12px;
+      background: #e0e0e0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .reset-btn:hover { background: #d0d0d0; }
+
+    .header {
+      border-bottom: 2px solid #2b2b2b;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 10px;
+    }
+    h1 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+    .student-name {
+      font-size: 16px;
+      color: #333;
+    }
+    .gen-date {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+    
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 5px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+    }
+    th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+    tfoot td {
+      font-weight: bold;
+      background-color: #fafafa;
+    }
+    .col-center { text-align: center; }
+    .col-right { text-align: right; }
+    .col-fit {
+      width: 1%;
+      white-space: nowrap;
+    }
+
+    .print-btn {
+      padding: 8px 16px;
+      background: #0b57d0;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .print-btn:hover { background: #0842a0; }
+
+    /* RWD dla smartfonów */
+    @media (max-width: 600px) {
+      body {
+        margin: 10px;
+      }
+      .controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+      .controls .spacer {
+        display: none;
+      }
+      .controls label {
+        justify-content: space-between;
+      }
+      .controls input[type="date"] {
+        flex-grow: 1;
+      }
+      .print-btn, .reset-btn {
+        width: 100%;
+        text-align: center;
+      }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      h1 {
+        font-size: 18px;
+      }
+    }
+
+    /* Reguły druku / PDF */
+    @media print {
+      .controls { display: none !important; }
+      body { margin: 0; padding: 10mm; }
+      .table-container { overflow-x: visible; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Pasek filtrów i drukowania -->
+  <div class="controls">
+    <button class="print-btn" onclick="window.print()">Drukuj / Zapisz PDF</button>
+    <div class="spacer" style="flex-grow: 1;"></div>
+    <label>
+      Od:
+      <input type="date" id="dateFrom" onchange="renderReport()">
+    </label>
+    <label>
+      Do:
+      <input type="date" id="dateTo" onchange="renderReport()">
+    </label>
+    <button class="reset-btn" onclick="clearFilters()">Wyczyść filtr</button>
+  </div>
+
+  <div class="header">
+    <div>
+      <h1>Raport zrealizowanych lekcji</h1>
+      <div class="student-name" id="studentHeader">Uczeń: —</div>
+    </div>
+    <div class="gen-date" id="reportDate"></div>
+  </div>
+
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-fit col-center">Lp.</th>
+          <th class="col-fit">Termin</th>
+          <th class="col-fit col-center">Godz.</th>
+          <th>Temat / Notatki</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="4" class="col-center">Wybierz ucznia w tabeli obok.</td></tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" class="col-right">Łącznie:</td>
+          <td class="col-fit col-center" id="totalHours">0 h</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+
+  <script>
+    grist['\u0072\u0065\u0061\u0064\u0079']({"requiredAccess":"\u0072\u0065\u0061\u0064\u0020\u0074\u0061\u0062\u006C\u0065"});var _0x910a8g=(595746^595754)+(881456^881459);let rawRecordsCache=[];_0x910a8g=695919^695918;let studentsMap={};function parseDate(val){if(!val)return null;var _0xec301c=(884340^884339)+(828994^828998);const d=typeof val==="rebmun".split("").reverse().join("")?new Date(val*(439087^438471)):new Date(val);_0xec301c='\u0064\u0070\u0067\u006C\u0071\u006A';return isNaN(d['\u0067\u0065\u0074\u0054\u0069\u006D\u0065']())?null:d;}function formatGristDate(d,_0x_0x5cg){if(!d)return"\u2014";const _0xbc_0x455=String(d['\u0067\u0065\u0074\u0044\u0061\u0074\u0065']())['\u0070\u0061\u0064\u0053\u0074\u0061\u0072\u0074'](569537^569539,"\u0030");const _0x24d0bc=String(d['\u0067\u0065\u0074\u004D\u006F\u006E\u0074\u0068']()+(411508^411509))['\u0070\u0061\u0064\u0053\u0074\u0061\u0072\u0074'](238525^238527,"\u0030");const _0xf5cd5d=d['\u0067\u0065\u0074\u0046\u0075\u006C\u006C\u0059\u0065\u0061\u0072']();_0x_0x5cg=(586783^586780)+(336826^336831);var _0xe44g=(653966^653960)+(991982^991975);const _0xa9202g=String(d['\u0067\u0065\u0074\u0048\u006F\u0075\u0072\u0073']())['\u0070\u0061\u0064\u0053\u0074\u0061\u0072\u0074'](111046^111044,"\u0030");_0xe44g=(683654^683651)+(100571^100571);const _0x4549a=String(d['\u0067\u0065\u0074\u004D\u0069\u006E\u0075\u0074\u0065\u0073']())['\u0070\u0061\u0064\u0053\u0074\u0061\u0072\u0074'](634765^634767,"\u0030");return`${_0xbc_0x455}.${_0x24d0bc}.${_0xf5cd5d} ${_0xa9202g}:${_0x4549a}`;}async function loadStudents(){try{let _0x6fdb;const _0xf6a=await grist['\u0064\u006F\u0063\u0041\u0070\u0069']['\u0066\u0065\u0074\u0063\u0068\u0054\u0061\u0062\u006C\u0065']("eiwoinzcU".split("").reverse().join(""));_0x6fdb=749038^749037;if(_0xf6a&&_0xf6a['\u0069\u0064']&&(_0xf6a['\u0049\u006D\u0069\u0065\u005F\u0069\u005F\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F']||_0xf6a['Imie i nazwisko'])){const _0x6g18c=_0xf6a['\u0049\u006D\u0069\u0065\u005F\u0069\u005F\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F']||_0xf6a["\u0049\u006D\u0069\u0065\u0020\u0069\u0020\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F"];for(let i=972984^972984;i<_0xf6a['\u0069\u0064']['\u006C\u0065\u006E\u0067\u0074\u0068'];i++){studentsMap[_0xf6a['\u0069\u0064'][i]]=_0x6g18c[i];}}}catch(e){console['\u0065\u0072\u0072\u006F\u0072']("\u0042\u0142\u0105\u0064\u0020\u0070\u006F\u0062\u0069\u0065\u0072\u0061\u006E\u0069\u0061\u0020\u0062\u0061\u007A\u0079\u0020\u0075\u0063\u007A\u006E\u0069\u00F3\u0077\u003A",e);}}loadStudents();function renderReport(_0x3bd78d,_0x42e45f,_0x7a98e,_0xdf1dfb,_0xffb3b,_0x0g66a,_0x425e8b){const _0xb456e=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0074\u0061\u0062\u006C\u0065\u0042\u006F\u0064\u0079");_0x3bd78d=(198212^198213)+(849487^849485);const _0xc62fda=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("redaeHtneduts".split("").reverse().join(""));const _0x8a6d=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0074\u006F\u0074\u0061\u006C\u0048\u006F\u0075\u0072\u0073");document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0072\u0065\u0070\u006F\u0072\u0074\u0044\u0061\u0074\u0065")['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`Data: ${new Date()['\u0074\u006F\u004C\u006F\u0063\u0061\u006C\u0065\u0044\u0061\u0074\u0065\u0053\u0074\u0072\u0069\u006E\u0067']("\u0070\u006C\u002D\u0050\u004C")}`;if(!rawRecordsCache||rawRecordsCache['\u006C\u0065\u006E\u0067\u0074\u0068']===(152567^152567)){_0xb456e['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']=">rt/<>dt/<.ainelteiw\u015Byw od ijckel karB>\"retnec-loc\"=ssalc \"4\"=napsloc dt<>rt<".split("").reverse().join("");_0xc62fda['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']="\u2014 :\u0144ezcU".split("").reverse().join("");_0x8a6d['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']="\u0030\u0020\u0068";return;}const _0xa529a=rawRecordsCache[316590^316590]['\u0049\u006D\u0069\u0065\u005F\u0069\u005F\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F']||rawRecordsCache[267596^267596]["\u0049\u006D\u0069\u0065\u0020\u0069\u0020\u006E\u0061\u007A\u0077\u0069\u0073\u006B\u006F"];_0x42e45f=(908353^908357)+(919840^919847);_0xc62fda['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']=`<strong>Uczeń:</strong> ${studentsMap[_0xa529a]||_0xa529a||"\u2014"}`;const _0x6efce=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("morFetad".split("").reverse().join(""))['\u0076\u0061\u006C\u0075\u0065'];const _0x2f4d=document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0054\u006F")['\u0076\u0061\u006C\u0075\u0065'];const _0x6cce=_0x6efce?new Date(_0x6efce+"00:00:00T".split("").reverse().join("")):null;_0x7a98e='\u0071\u0067\u0067\u006E\u006B\u0065';const _0x71841f=_0x2f4d?new Date(_0x2f4d+"\u0054\u0032\u0033\u003A\u0035\u0039\u003A\u0035\u0039"):null;_0xdf1dfb=(356570^356568)+(703218^703218);_0xffb3b='';var _0x664c4a=(571522^571531)+(919166^919160);_0x0g66a=107655^107655;_0x664c4a=425949^425941;_0x425e8b=428565^428565;rawRecordsCache['\u0066\u006F\u0072\u0045\u0061\u0063\u0068'](row=>{const d=parseDate(row['\u0044\u0061\u0074\u0061\u005F\u0072\u006F\u007A\u0070\u006F\u0063\u007A\u0065\u0063\u0069\u0061']||row["\u0044\u0061\u0074\u0061\u0020\u0072\u006F\u007A\u0070\u006F\u0063\u007A\u0119\u0063\u0069\u0061"]);if(d){if(_0x6cce&&d<_0x6cce)return;if(_0x71841f&&d>_0x71841f)return;}_0x425e8b++;let _0xcc_0xd49;const _0x1acebc=row['\u004E\u006F\u0074\u0061\u0074\u006B\u0069']||"\u2014";_0xcc_0xd49=768416^768421;const _0x95c=Number(row['\u0047\u006F\u0064\u007A\u0069\u006E'])||934443^934443;_0x0g66a+=_0x95c;_0xffb3b+=`
+          <tr>
+            <td class="col-fit col-center">${_0x425e8b}</td>
+            <td class="col-fit">${formatGristDate(d)}</td>
+            <td class="col-fit col-center">${_0x95c}</td>
+            <td>${String(_0x1acebc)['\u0072\u0065\u0070\u006C\u0061\u0063\u0065'](new RegExp('\u005C\u006E','\u0067'),">rb<".split("").reverse().join(""))}</td>
+          </tr>
+        `;});if(_0x425e8b===(126728^126728)){_0xb456e['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']="\u003C\u0074\u0072\u003E\u003C\u0074\u0064\u0020\u0063\u006F\u006C\u0073\u0070\u0061\u006E\u003D\u0022\u0034\u0022\u0020\u0063\u006C\u0061\u0073\u0073\u003D\u0022\u0063\u006F\u006C\u002D\u0063\u0065\u006E\u0074\u0065\u0072\u0022\u003E\u0042\u0072\u0061\u006B\u0020\u006C\u0065\u006B\u0063\u006A\u0069\u0020\u0077\u0020\u0077\u0079\u0062\u0072\u0061\u006E\u0079\u006D\u0020\u0070\u0072\u007A\u0065\u0064\u007A\u0069\u0061\u006C\u0065\u0020\u0064\u0061\u0074\u002E\u003C\u002F\u0074\u0064\u003E\u003C\u002F\u0074\u0072\u003E";}else{_0xb456e['\u0069\u006E\u006E\u0065\u0072\u0048\u0054\u004D\u004C']=_0xffb3b;}_0x8a6d['\u0074\u0065\u0078\u0074\u0043\u006F\u006E\u0074\u0065\u006E\u0074']=`${_0x0g66a} h`;}function clearFilters(){document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("morFetad".split("").reverse().join(""))['\u0076\u0061\u006C\u0075\u0065']='';document['\u0067\u0065\u0074\u0045\u006C\u0065\u006D\u0065\u006E\u0074\u0042\u0079\u0049\u0064']("\u0064\u0061\u0074\u0065\u0054\u006F")['\u0076\u0061\u006C\u0075\u0065']='';renderReport();}grist['\u006F\u006E\u0052\u0065\u0063\u006F\u0072\u0064\u0073'](records=>{rawRecordsCache=records||[];renderReport();});
+  </script>
+</body>
+</html>
