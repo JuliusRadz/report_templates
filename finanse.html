@@ -302,7 +302,6 @@
 
   let allLessons = [];
   let studentsMap = {};
-  let paymentTypesMap = {};
 
   function parseDate(val) {
     if (!val) return null;
@@ -310,8 +309,8 @@
     return isNaN(d.getTime()) ? null : d;
   }
 
-  // Pobranie słowników (Uczniowie oraz Poziom dla typu płatności)
-  async function loadDictionaries() {
+  // Pobranie nazwisk uczniów
+  async function loadStudents() {
     try {
       const uData = await grist.docApi.fetchTable('Uczniowie');
       if (uData && uData.id) {
@@ -323,22 +322,10 @@
     } catch (e) {
       console.warn("Błąd bazy uczniów:", e);
     }
-
-    try {
-      const pData = await grist.docApi.fetchTable('Poziom');
-      if (pData && pData.id && pData.Typ) {
-        for (let i = 0; i < pData.id.length; i++) {
-          paymentTypesMap[pData.id[i]] = pData.Typ[i];
-        }
-      }
-    } catch (e) {
-      console.warn("Błąd bazy poziomów:", e);
-    }
-
     renderDashboard();
   }
 
-  loadDictionaries();
+  loadStudents();
 
   function setThisMonth() {
     const now = new Date();
@@ -376,11 +363,10 @@
     const studentSummary = {};
 
     allLessons.forEach(row => {
-      // 1. Wyłącznie lekcje zrealizowane
-      const isDone = Boolean(row.Zrealizowano);
-      if (!isDone) return;
+      // 1. Wyłącznie zrealizowane lekcje
+      if (!row.Zrealizowano) return;
 
-      // 2. Filtr dat
+      // 2. Zakres dat
       const d = parseDate(row.Data_rozpoczecia || row['Data rozpoczęcia']);
       if (d) {
         if (dateFrom && d < dateFrom) return;
@@ -390,7 +376,7 @@
       const amount = Number(row.Kwota) || 0;
       const hours = Number(row.Godzin) || 0;
 
-      // 3. Status opłacenia ($Czy_zaplacono)
+      // 3. Status płatności ($Czy_zaplacono)
       const isPaid = Boolean(
         row._Czy_zaplacono ||
         row['$Czy_zaplacono'] ||
@@ -398,11 +384,16 @@
         row['Czy zaplacono']
       );
 
-      // 4. Odczyt Typu płatności (kolumna $Typ_p_atnsci)
-      const rawPayVal = row.Typ_p_atnsci ?? row['$Typ_p_atnsci'] ?? row.Typ_p_atno_ci ?? row['Typ płatności'];
-      
-      // Jeśli to referencja (liczba) -> bierzemy z paymentTypesMap, w przeciwnym razie czysty tekst
-      const resolvedPayType = String(paymentTypesMap[rawPayVal] || rawPayVal || '').toLowerCase().trim();
+      // 4. Typ płatności: obsługa nowej nazwy $Typ_platnsci oraz wariantów
+      const payType = String(
+        row.Typ_platnsci ||
+        row['$Typ_platnsci'] ||
+        row.Typ_platnosci ||
+        row['Typ platnsci'] ||
+        row['Typ płatności'] ||
+        row.Typ_p_atnsci ||
+        ''
+      ).toLowerCase().trim();
 
       totalRevenue += amount;
       totalHours += hours;
@@ -414,17 +405,17 @@
         totalUnpaid += amount;
       }
 
-      if (resolvedPayType.includes('przelew')) {
+      if (payType.includes('przelew')) {
         splitTransfer += amount;
-      } else if (resolvedPayType.includes('gotów') || resolvedPayType.includes('gotow')) {
+      } else if (payType.includes('gotów') || payType.includes('gotow')) {
         splitCash += amount;
       } else {
         splitOther += amount;
       }
 
-      // 5. Agregacja ucznia
-      const rawStudentRef = row.Imie_i_nazwisko || row['Imie i nazwisko'];
-      const studentName = row.Imie_i_nazwisko_text || studentsMap[rawStudentRef] || rawStudentRef || 'Nieprzypisany';
+      // 5. Agregacja per uczeń
+      const rawRef = row.Imie_i_nazwisko || row['Imie i nazwisko'];
+      const studentName = row.Imie_i_nazwisko_text || studentsMap[rawRef] || rawRef || 'Nieprzypisany';
 
       if (!studentSummary[studentName]) {
         studentSummary[studentName] = { lessons: 0, hours: 0, revenue: 0, paid: 0, unpaid: 0 };
@@ -440,7 +431,7 @@
       }
     });
 
-    // KPI
+    // Wartości KPI
     document.getElementById('kpiTotal').textContent = `${totalRevenue.toFixed(2)} zł`;
     document.getElementById('kpiPaid').textContent = `${totalPaid.toFixed(2)} zł`;
     document.getElementById('kpiUnpaid').textContent = `${totalUnpaid.toFixed(2)} zł`;
@@ -457,15 +448,15 @@
     document.getElementById('splitCash').textContent = `${splitCash.toFixed(2)} zł`;
     document.getElementById('splitOther').textContent = `${splitOther.toFixed(2)} zł`;
 
-    // Tabela uczniów
+    // Tabela podsumowania uczniów
     const tbody = document.getElementById('summaryBody');
-    const studentsKeys = Object.keys(studentSummary);
+    const studentNames = Object.keys(studentSummary);
 
-    if (studentsKeys.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="col-center">Brak zrealizowanych lekcji w podanym okresie.</td></tr>';
+    if (studentNames.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="col-center">Brak zrealizowanych lekcji w wybranym okresie.</td></tr>';
     } else {
       let html = '';
-      studentsKeys.sort().forEach(name => {
+      studentNames.sort().forEach(name => {
         const s = studentSummary[name];
         html += `
           <tr>
