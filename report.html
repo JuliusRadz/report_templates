@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Raport Lekcji</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    .header {
+      border-bottom: 2px solid #2b2b2b;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    h1 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+    }
+    .student-name {
+      font-size: 16px;
+      color: #333;
+    }
+    .gen-date {
+      font-size: 12px;
+      color: #666;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+      table-layout: fixed;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 10px;
+      text-align: left;
+      font-size: 13px;
+      word-wrap: break-word;
+    }
+    th {
+      background-color: #f2f2f2;
+      font-weight: bold;
+    }
+    tfoot td {
+      font-weight: bold;
+      background-color: #fafafa;
+    }
+    .col-center { text-align: center; }
+    .col-right { text-align: right; }
+    .print-btn {
+      padding: 9px 16px;
+      background: #0b57d0;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 13px;
+      margin-bottom: 15px;
+    }
+    .print-btn:hover { background: #0842a0; }
+
+    @media print {
+      .print-btn { display: none; }
+      body { margin: 0; padding: 10mm; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <button class="print-btn" onclick="window.print()">Drukuj / Zapisz jako PDF</button>
+
+  <div class="header">
+    <div>
+      <h1>Raport zrealizowanych lekcji</h1>
+      <div class="student-name" id="studentHeader">Uczeń: —</div>
+    </div>
+    <div class="gen-date" id="reportDate"></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40px;" class="col-center">Lp.</th>
+        <th style="width: 135px;">Termin</th>
+        <th style="width: 65px;" class="col-center">Godz.</th>
+        <th>Temat / Notatki</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody">
+      <tr><td colspan="4" class="col-center">Wybierz ucznia lub włącz filtr w tabeli Lekcje.</td></tr>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="2" class="col-right">Łącznie:</td>
+        <td class="col-center" id="totalHours">0 h</td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <script>
+    grist.ready({ requiredAccess: 'read table' });
+
+    function formatGristDate(val) {
+      if (!val) return '—';
+      const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
+      if (isNaN(d.getTime())) return val;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}.${month}.${year} ${hours}:${mins}`;
+    }
+
+    let studentsMap = {};
+
+    async function loadStudents() {
+      try {
+        const data = await grist.docApi.fetchTable('Uczniowie');
+        if (data && data.id && (data.Imie_i_nazwisko || data['Imie i nazwisko'])) {
+          const names = data.Imie_i_nazwisko || data['Imie i nazwisko'];
+          for (let i = 0; i < data.id.length; i++) {
+            studentsMap[data.id[i]] = names[i];
+          }
+        }
+      } catch (e) {
+        console.error("Błąd pobierania tabeli Uczniowie:", e);
+      }
+    }
+
+    loadStudents();
+
+    grist.onRecords((records) => {
+      const tbody = document.getElementById('tableBody');
+      const studentElem = document.getElementById('studentHeader');
+      const totalHoursElem = document.getElementById('totalHours');
+
+      document.getElementById('reportDate').textContent = `Data: ${new Date().toLocaleDateString('pl-PL')}`;
+
+      if (!records || records.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="col-center">Brak lekcji do wyświetlenia.</td></tr>';
+        studentElem.innerHTML = 'Uczeń: —';
+        totalHoursElem.textContent = '0 h';
+        return;
+      }
+
+      const rawRef = records[0].Imie_i_nazwisko || records[0]['Imie i nazwisko'];
+      const studentDisplay = studentsMap[rawRef] || rawRef || '—';
+      studentElem.innerHTML = `<strong>Uczeń:</strong> ${studentDisplay}`;
+
+      let rowsHtml = '';
+      let sumHours = 0;
+
+      records.forEach((row, index) => {
+        const start = row.Data_rozpoczecia || row['Data rozpoczęcia'];
+        const notes = row.Notatki || '—';
+        const hours = Number(row.Godzin) || 0;
+
+        sumHours += hours;
+
+        rowsHtml += `
+          <tr>
+            <td class="col-center">${index + 1}</td>
+            <td>${formatGristDate(start)}</td>
+            <td class="col-center">${hours}</td>
+            <td>${String(notes).replace(/\n/g, '<br>')}</td>
+          </tr>
+        `;
+      });
+
+      tbody.innerHTML = rowsHtml;
+      totalHoursElem.textContent = `${sumHours} h`;
+    });
+  </script>
+</body>
+</html>
