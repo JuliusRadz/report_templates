@@ -301,31 +301,12 @@
   grist.ready({ requiredAccess: 'read table' });
 
   let allLessons = [];
-  let studentsMap = {};
 
   function parseDate(val) {
     if (!val) return null;
     const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
     return isNaN(d.getTime()) ? null : d;
   }
-
-  // Pobranie nazwisk uczniów
-  async function loadStudents() {
-    try {
-      const uData = await grist.docApi.fetchTable('Uczniowie');
-      if (uData && uData.id) {
-        const names = uData.Imie_i_nazwisko || uData['Imie i nazwisko'] || uData.Imie_i_nazwisko_text;
-        for (let i = 0; i < uData.id.length; i++) {
-          studentsMap[uData.id[i]] = names[i];
-        }
-      }
-    } catch (e) {
-      console.warn("Błąd pobierania bazy uczniów:", e);
-    }
-    renderDashboard();
-  }
-
-  loadStudents();
 
   function setThisMonth() {
     const now = new Date();
@@ -363,7 +344,7 @@
     const studentSummary = {};
 
     allLessons.forEach(row => {
-      // 1. Wyłącznie zrealizowane lekcje
+      // 1. Tylko zrealizowane lekcje
       if (!row.Zrealizowano) return;
 
       // 2. Zakres dat
@@ -400,9 +381,8 @@
         splitOther += amount;
       }
 
-      // 5. Agregacja per uczeń
-      const rawRef = row.Imie_i_nazwisko || row['Imie i nazwisko'];
-      const studentName = row.Imie_i_nazwisko_text || studentsMap[rawRef] || rawRef || 'Nieprzypisany';
+      // 5. Nazwisko ucznia bezpośrednio z rekordu
+      const studentName = row.Imie_i_nazwisko_text || row.Imie_i_nazwisko || 'Nieprzypisany';
 
       if (!studentSummary[studentName]) {
         studentSummary[studentName] = { lessons: 0, hours: 0, revenue: 0, paid: 0, unpaid: 0 };
@@ -435,7 +415,7 @@
     document.getElementById('splitCash').textContent = `${splitCash.toFixed(2)} zł`;
     document.getElementById('splitOther').textContent = `${splitOther.toFixed(2)} zł`;
 
-    // Tabela podsumowania uczniów
+    // Tabela uczniów
     const tbody = document.getElementById('summaryBody');
     const studentNames = Object.keys(studentSummary);
 
