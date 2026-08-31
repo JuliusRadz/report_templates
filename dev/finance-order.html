@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Finansowy</title>
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --bg: #f8f9fa;
+      --card-bg: #ffffff;
+      --border: #e0e0e0;
+      --text: #202124;
+      --text-muted: #5f6368;
+      --success: #1e8e3e;
+      --danger: #d93025;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-bg);
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .filter-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    input[type="date"] {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .btn {
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background-color 0.2s;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #1557b0; }
+    .btn-secondary { background: #e8eaed; color: var(--text); }
+    .btn-secondary:hover { background: #dadce0; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+      border-top-left-radius: 8px;
+      border-bottom-left-radius: 8px;
+      background: var(--border);
+    }
+
+    .kpi-card.kpi-hours::before { background: #f9ab00; }
+    .kpi-card.kpi-total::before { background: var(--primary); }
+    .kpi-card.kpi-paid::before { background: var(--success); }
+    .kpi-card.kpi-unpaid::before { background: var(--danger); }
+
+    .kpi-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .split-card {
+      background: var(--card-bg);
+      padding: 14px 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+      gap: 15px;
+      font-size: 13px;
+    }
+
+    .split-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .split-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .table-card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    tfoot td {
+      font-weight: 700;
+      background-color: #fafafa;
+    }
+
+    .col-right { text-align: right; }
+    .col-center { text-align: center; }
+
+    .text-success { color: var(--success); font-weight: 600; }
+    .text-danger { color: var(--danger); font-weight: 600; }
+
+    @media print {
+      body { background: #fff; padding: 0; }
+      .controls { display: none !important; }
+      .kpi-card, .table-card, .split-card { box-shadow: none; border-color: #ccc; }
+      @page { size: A4 landscape; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="controls">
+    <button class="btn btn-primary" onclick="window.print()">Drukuj / Zapisz PDF</button>
+    <div class="filter-group">
+      <label>Od: <input type="date" id="dateFrom" onchange="renderDashboard()"></label>
+      <label>Do: <input type="date" id="dateTo" onchange="renderDashboard()"></label>
+      <button class="btn btn-secondary" onclick="setThisMonth()">Bieżący miesiąc</button>
+      <button class="btn btn-secondary" onclick="clearFilters()">Wyczyść</button>
+    </div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-hours">
+      <div class="kpi-title">Przepracowane</div>
+      <div class="kpi-value" id="kpiHours">0 h</div>
+      <div class="kpi-sub" id="kpiLessonsCount">0 lekcji</div>
+    </div>
+
+    <div class="kpi-card kpi-total">
+      <div class="kpi-title">Przychód łączny</div>
+      <div class="kpi-value" id="kpiTotal">0,00 zł</div>
+      <div class="kpi-sub">ze zrealizowanych lekcji</div>
+    </div>
+
+    <div class="kpi-card kpi-paid">
+      <div class="kpi-title">Opłacone</div>
+      <div class="kpi-value text-success" id="kpiPaid">0,00 zł</div>
+      <div class="kpi-sub" id="kpiPaidPct">0% przychodu</div>
+    </div>
+
+    <div class="kpi-card kpi-unpaid">
+      <div class="kpi-title">Do zapłaty</div>
+      <div class="kpi-value text-danger" id="kpiUnpaid">0,00 zł</div>
+      <div class="kpi-sub" id="kpiUnpaidPct">0% zaległości</div>
+    </div>
+  </div>
+
+  <div class="split-card">
+    <div class="split-item">
+      <div class="split-dot" style="background: #1a73e8;"></div>
+      <span>Przelew: <strong id="splitTransfer">0,00 zł</strong></span>
+    </div>
+    <div class="split-item">
+      <div class="split-dot" style="background: #34a853;"></div>
+      <span>Gotówka: <strong id="splitCash">0,00 zł</strong></span>
+    </div>
+    <div class="split-item">
+      <div class="split-dot" style="background: #80868b;"></div>
+      <span>Nieokreślono: <strong id="splitOther">0,00 zł</strong></span>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>Uczeń</th>
+          <th class="col-center">Lekcje</th>
+          <th class="col-center">Godziny</th>
+          <th class="col-right">Przychód</th>
+          <th class="col-right">Opłacono</th>
+          <th class="col-right">Zaległość</th>
+        </tr>
+      </thead>
+      <tbody id="summaryBody">
+        <tr><td colspan="6" class="col-center">Ładowanie danych...</td></tr>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Podsumowanie:</td>
+          <td class="col-center" id="footLessons">0</td>
+          <td class="col-center" id="footHours">0 h</td>
+          <td class="col-right" id="footTotal">0,00 zł</td>
+          <td class="col-right text-success" id="footPaid">0,00 zł</td>
+          <td class="col-right text-danger" id="footUnpaid">0,00 zł</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+<script>
+  grist.ready({ requiredAccess: 'read table' });
+
+  let allLessons = [];
+
+  function parseDate(val) {
+    if (!val) return null;
+    const d = typeof val === 'number' ? new Date(val * 1000) : new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function setThisMonth() {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    const pad = (n) => String(n).padStart(2, '0');
+    document.getElementById('dateFrom').value = `${firstDay.getFullYear()}-${pad(firstDay.getMonth() + 1)}-01`;
+    document.getElementById('dateTo').value = `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`;
+    renderDashboard();
+  }
+
+  function clearFilters() {
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    renderDashboard();
+  }
+
+  function renderDashboard() {
+    const fromVal = document.getElementById('dateFrom').value;
+    const toVal = document.getElementById('dateTo').value;
+    const dateFrom = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+    const dateTo = toVal ? new Date(toVal + 'T23:59:59') : null;
+
+    let totalRevenue = 0;
+    let totalPaid = 0;
+    let totalUnpaid = 0;
+    let totalHours = 0;
+    let totalLessonsCount = 0;
+
+    let splitTransfer = 0;
+    let splitCash = 0;
+    let splitOther = 0;
+
+    const studentSummary = {};
+
+    allLessons.forEach(row => {
+      if (!row.IsCompleted) return;
+
+      const d = parseDate(row.LessonStartDateTime);
+      if (d) {
+        if (dateFrom && d < dateFrom) return;
+        if (dateTo && d > dateTo) return;
+      }
+
+      const amount = Number(row.Amount) || 0;
+      const hours = Number(row.Hours) || 0;
+      const isPaid = Boolean(row.IsPaid);
+      const payType = String(row.PaymentType || '').toLowerCase().trim();
+
+      totalRevenue += amount;
+      totalHours += hours;
+      totalLessonsCount++;
+
+      if (isPaid) {
+        totalPaid += amount;
+      } else {
+        totalUnpaid += amount;
+      }
+
+      if (payType.includes('przelew')) {
+        splitTransfer += amount;
+      } else if (payType.includes('gotów') || payType.includes('gotow')) {
+        splitCash += amount;
+      } else {
+        splitOther += amount;
+      }
+
+      const studentName = row.FullNameText || row.StudentId || 'Nieprzypisany';
+
+      if (!studentSummary[studentName]) {
+        studentSummary[studentName] = { lessons: 0, hours: 0, revenue: 0, paid: 0, unpaid: 0 };
+      }
+
+      studentSummary[studentName].lessons += 1;
+      studentSummary[studentName].hours += hours;
+      studentSummary[studentName].revenue += amount;
+      if (isPaid) {
+        studentSummary[studentName].paid += amount;
+      } else {
+        studentSummary[studentName].unpaid += amount;
+      }
+    });
+
+    document.getElementById('kpiHours').textContent = `${totalHours} h`;
+    document.getElementById('kpiLessonsCount').textContent = `${totalLessonsCount} lekcji`;
+    document.getElementById('kpiTotal').textContent = `${totalRevenue.toFixed(2)} zł`;
+    document.getElementById('kpiPaid').textContent = `${totalPaid.toFixed(2)} zł`;
+    document.getElementById('kpiUnpaid').textContent = `${totalUnpaid.toFixed(2)} zł`;
+
+    const paidPct = totalRevenue > 0 ? Math.round((totalPaid / totalRevenue) * 100) : 0;
+    const unpaidPct = totalRevenue > 0 ? Math.round((totalUnpaid / totalRevenue) * 100) : 0;
+    document.getElementById('kpiPaidPct').textContent = `${paidPct}% przychodu`;
+    document.getElementById('kpiUnpaidPct').textContent = `${unpaidPct}% zaległości`;
+
+    document.getElementById('splitTransfer').textContent = `${splitTransfer.toFixed(2)} zł`;
+    document.getElementById('splitCash').textContent = `${splitCash.toFixed(2)} zł`;
+    document.getElementById('splitOther').textContent = `${splitOther.toFixed(2)} zł`;
+
+    const tbody = document.getElementById('summaryBody');
+    const studentNames = Object.keys(studentSummary);
+
+    if (studentNames.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="col-center">Brak zrealizowanych lekcji w wybranym okresie.</td></tr>';
+    } else {
+      let html = '';
+      studentNames.sort().forEach(name => {
+        const s = studentSummary[name];
+        html += `
+          <tr>
+            <td><strong>${name}</strong></td>
+            <td class="col-center">${s.lessons}</td>
+            <td class="col-center">${s.hours} h</td>
+            <td class="col-right">${s.revenue.toFixed(2)} zł</td>
+            <td class="col-right text-success">${s.paid.toFixed(2)} zł</td>
+            <td class="col-right ${s.unpaid > 0 ? 'text-danger' : ''}">${s.unpaid.toFixed(2)} zł</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    document.getElementById('footLessons').textContent = totalLessonsCount;
+    document.getElementById('footHours').textContent = `${totalHours} h`;
+    document.getElementById('footTotal').textContent = `${totalRevenue.toFixed(2)} zł`;
+    document.getElementById('footPaid').textContent = `${totalPaid.toFixed(2)} zł`;
+    document.getElementById('footUnpaid').textContent = `${totalUnpaid.toFixed(2)} zł`;
+  }
+
+  grist.onRecords((records) => {
+    allLessons = records || [];
+    renderDashboard();
+  });
+</script>
+</body>
+</html>
