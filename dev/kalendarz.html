@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kalendarz Lekcji</title>
+  
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.10/locales/pl.global.min.js"></script>
+
+  <style>
+    :root {
+      --primary: #1a73e8;
+      --bg: #18181c;
+      --card-bg: #262631;
+      --border: #3a3a4a;
+      --text: #ffffff;
+      --text-muted: #9aa0a6;
+      --success: #1e8e3e;
+      --danger: #d93025;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      overflow-x: hidden;
+    }
+
+    #calendar-container {
+      width: 100%;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 6px;
+      background: var(--bg);
+    }
+
+    #calendar {
+      flex: 1;
+      min-height: 0;
+      background: var(--card-bg);
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .fc {
+      height: 100% !important;
+      --fc-border-color: var(--border);
+      --fc-page-bg-color: var(--card-bg);
+      --fc-neutral-bg-color: #202029;
+      --fc-list-event-hover-bg-color: #333342;
+      --fc-today-bg-color: rgba(26, 115, 232, 0.08);
+      font-size: 13px;
+    }
+    
+    .fc .fc-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px !important;
+    }
+
+    .fc .fc-toolbar-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .fc .fc-button {
+      background-color: #343444;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius: 6px;
+      text-transform: capitalize;
+    }
+    .fc .fc-button:hover { background-color: var(--primary); border-color: var(--primary); }
+    .fc .fc-button-active { background-color: var(--primary) !important; border-color: var(--primary) !important; }
+    .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border); }
+    .fc-col-header-cell-cushion { color: var(--text-muted); padding: 6px 0; text-decoration: none; }
+    .fc-timegrid-slot-label-cushion { color: var(--text-muted); font-size: 11px; }
+
+    .fc-timegrid-event {
+      border-radius: 4px;
+      padding: 2px 4px;
+      font-size: 12px;
+    }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 9999;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal-card {
+      background: #22222c;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+      overflow: hidden;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 12px 16px;
+      background: #2a2a37;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .modal-close {
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      line-height: 1;
+      padding: 0 4px;
+    }
+
+    .modal-body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-group label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-control {
+      background: #181820;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 9px 10px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .form-control:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .checkbox-row {
+      display: flex;
+      gap: 20px;
+      padding: 6px 0;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .checkbox-label input {
+      width: 18px;
+      height: 18px;
+    }
+
+    .modal-footer {
+      padding: 12px 16px;
+      background: #1c1c24;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 9px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-secondary { background: #343444; color: white; }
+
+    @media (max-width: 600px) {
+      #calendar-container { padding: 2px; }
+      #calendar { padding: 4px; border-radius: 0; border: none; }
+      .fc .fc-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .fc .fc-toolbar-chunk {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 3px;
+      }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="calendar-container">
+  <div id="calendar"></div>
+</div>
+
+<div class="modal-overlay" id="eventModal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span id="modalTitle">Zaplanuj lekcję</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editRowId" value="">
+
+      <div class="form-group">
+        <label>Uczeń</label>
+        <select id="studentSelect" class="form-control" onchange="onStudentChange()">
+          <option value="">-- Wybierz ucznia --</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Od</label>
+          <input type="datetime-local" id="startTime" class="form-control" onchange="recalculateHours()">
+        </div>
+        <div class="form-group">
+          <label>Do</label>
+          <input type="datetime-local" id="endTime" class="form-control" onchange="recalculateHours()">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Godzin (auto)</label>
+          <input type="number" step="0.5" id="hoursCount" class="form-control" readonly style="opacity: 0.65;">
+        </div>
+        <div class="form-group">
+          <label>Kwota (auto)</label>
+          <input type="number" id="totalAmount" class="form-control" readonly style="opacity: 0.65;">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Płatność</label>
+        <select id="payType" class="form-control">
+          <option value="Gotówka">Gotówka</option>
+          <option value="Przelew">Przelew</option>
+          <option value="">Nieokreślono</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Notatki / Temat</label>
+        <input type="text" id="lessonNotes" class="form-control" placeholder="np. Geometria, Potęgowanie">
+      </div>
+
+      <div class="checkbox-row">
+        <label class="checkbox-label">
+          <input type="checkbox" id="isCompleted"> Zrealizowano
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="isPaid"> Opłacono
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="btnDelete" onclick="deleteLesson()" style="display: none;">Usuń</button>
+      <div style="display: flex; gap: 8px; margin-left: auto;">
+        <button class="btn btn-secondary" onclick="closeModal()">Anuluj</button>
+        <button class="btn btn-primary" onclick="saveLesson()">Zapisz</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let calendar = null;
+  let cachedRecords = null;
+  let allStudents = [];
+  let studentsMap = {};
+  let hasSetInitialDate = false;
+
+  function toLocalISO(date) {
+    if (!date || isNaN(date.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function parseDateValue(val) {
+    if (!val) return null;
+    if (typeof val === 'number') {
+      return new Date(val > 10000000000 ? val : val * 1000);
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  async function loadStudents() {
+    try {
+      const tableData = await grist.docApi.fetchTable('Students');
+      allStudents = [];
+      studentsMap = {};
+
+      const count = tableData.id.length;
+      for (let i = 0; i < count; i++) {
+        const student = {
+          id: tableData.id[i],
+          name: tableData.FullName[i],
+          rate: Number(tableData.HourlyRate ? tableData.HourlyRate[i] : 100) || 100,
+          active: Boolean(tableData.IsActive[i])
+        };
+
+        studentsMap[student.id] = student;
+        studentsMap[student.name.trim()] = student;
+        allStudents.push(student);
+      }
+      populateStudentSelect();
+    } catch (e) {
+      console.error('Błąd pobierania uczniów:', e);
+    }
+  }
+
+  function populateStudentSelect(selectedStudentId = null) {
+    const select = document.getElementById('studentSelect');
+    select.innerHTML = '<option value="">-- Wybierz ucznia --</option>';
+
+    allStudents.forEach(st => {
+      if (st.active || (selectedStudentId && Number(selectedStudentId) === Number(st.id))) {
+        const opt = document.createElement('option');
+        opt.value = st.id;
+        opt.textContent = `${st.name} (${st.rate} zł/h)${!st.active ? ' [Nieaktywny]' : ''}`;
+        select.appendChild(opt);
+      }
+    });
+
+    if (selectedStudentId) {
+      select.value = String(selectedStudentId);
+    }
+  }
+
+  function renderEvents(records) {
+    if (!calendar || !records) return;
+
+    const events = [];
+    let latestLessonDate = null;
+
+    records.forEach(row => {
+      const startDate = parseDateValue(row.LessonStartDateTime);
+      let endDate = parseDateValue(row.LessonEndDateTime);
+
+      if (!startDate) return;
+      if (!endDate) {
+        endDate = new Date(startDate.getTime() + 3600000);
+      }
+
+      if (!latestLessonDate || startDate > latestLessonDate) {
+        latestLessonDate = startDate;
+      }
+
+      const isCompleted = Boolean(row.IsCompleted);
+      const isPaid = Boolean(row.IsPaid);
+      const studentName = row.FullNameText || row.StudentId || 'Lekcja';
+
+      let bgColor = '#5f6368';
+      if (isCompleted && isPaid) bgColor = '#1e8e3e';
+      else if (isCompleted && !isPaid) bgColor = '#d93025';
+
+      events.push({
+        id: String(row.id),
+        title: `${studentName}${row.LessonNotes ? ' - ' + row.LessonNotes : ''}`,
+        start: startDate,
+        end: endDate,
+        backgroundColor: bgColor,
+        borderColor: bgColor,
+        extendedProps: { raw: row }
+      });
+    });
+
+    calendar.removeAllEvents();
+    calendar.addEventSource(events);
+
+    if (!hasSetInitialDate && latestLessonDate) {
+      calendar.gotoDate(latestLessonDate);
+      hasSetInitialDate = true;
+    }
+  }
+
+  grist.onRecords((records) => {
+    cachedRecords = records || [];
+    if (calendar) {
+      renderEvents(cachedRecords);
+    }
+  });
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    grist.ready({ requiredAccess: 'full' });
+    await loadStudents();
+
+    const isMobile = window.innerWidth < 768;
+    const calendarEl = document.getElementById('calendar');
+
+    calendar = new FullCalendar.Calendar(calendarEl, {
+      locale: 'pl',
+      initialView: isMobile ? 'timeGridDay' : 'timeGridWeek',
+      height: '100%',
+      expandRows: true,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: isMobile ? 'timeGridDay,timeGridWeek' : 'timeGridWeek,timeGridDay,listWeek'
+      },
+      slotMinTime: '07:00:00',
+      slotMaxTime: '22:00:00',
+      allDaySlot: false,
+      selectable: true,
+      selectMirror: true,
+      editable: true,
+      defaultTimedEventDuration: '01:00:00',
+      snapDuration: '00:30:00',
+      longPressDelay: 250,
+      selectLongPressDelay: 250,
+
+      select: function(info) {
+        let end = info.end;
+        if (end - info.start <= 1800000) {
+          end = new Date(info.start.getTime() + 3600000);
+        }
+        openModalForNew(info.start, end);
+      },
+
+      dateClick: function(info) {
+        if (isMobile) {
+          const start = info.date;
+          const end = new Date(start.getTime() + 3600000);
+          openModalForNew(start, end);
+        }
+      },
+
+      eventClick: function(info) {
+        openModalForEdit(info.event);
+      },
+
+      eventDrop: async function(info) {
+        await updateEventTimes(info.event);
+      },
+
+      eventResize: async function(info) {
+        await updateEventTimes(info.event);
+      }
+    });
+
+    calendar.render();
+
+    if (cachedRecords) {
+      renderEvents(cachedRecords);
+    }
+  });
+
+  function openModalForNew(start, end) {
+    document.getElementById('editRowId').value = '';
+    document.getElementById('modalTitle').textContent = 'Zaplanuj lekcję';
+    document.getElementById('btnDelete').style.display = 'none';
+
+    populateStudentSelect();
+    document.getElementById('studentSelect').value = '';
+    document.getElementById('startTime').value = toLocalISO(start);
+    document.getElementById('endTime').value = toLocalISO(end);
+    document.getElementById('lessonNotes').value = '';
+    document.getElementById('isCompleted').checked = false;
+    document.getElementById('isPaid').checked = false;
+    document.getElementById('payType').value = 'Gotówka';
+
+    recalculateHours();
+    document.getElementById('eventModal').classList.add('active');
+  }
+
+  function openModalForEdit(event) {
+    const row = event.extendedProps.raw;
+    document.getElementById('editRowId').value = row.id;
+    document.getElementById('modalTitle').textContent = 'Edytuj lekcję';
+    document.getElementById('btnDelete').style.display = 'block';
+
+    let matchedStudentId = '';
+    const sRaw = row.StudentId;
+
+    if (typeof sRaw === 'object' && sRaw !== null && sRaw.id) {
+      matchedStudentId = sRaw.id;
+    } else if (studentsMap[sRaw]) {
+      matchedStudentId = studentsMap[sRaw].id;
+    } else if (row.FullNameText && studentsMap[row.FullNameText.trim()]) {
+      matchedStudentId = studentsMap[row.FullNameText.trim()].id;
+    }
+
+    populateStudentSelect(matchedStudentId);
+
+    document.getElementById('startTime').value = toLocalISO(event.start);
+    document.getElementById('endTime').value = toLocalISO(event.end);
+    document.getElementById('lessonNotes').value = row.LessonNotes || '';
+    document.getElementById('isCompleted').checked = Boolean(row.IsCompleted);
+    document.getElementById('isPaid').checked = Boolean(row.IsPaid);
+    document.getElementById('payType').value = row.PaymentType || 'Gotówka';
+
+    recalculateHours();
+    document.getElementById('eventModal').classList.add('active');
+  }
+
+  function closeModal() {
+    document.getElementById('eventModal').classList.remove('active');
+  }
+
+  function onStudentChange() {
+    recalculateAmount();
+  }
+
+  function recalculateHours() {
+    const startVal = document.getElementById('startTime').value;
+    const endVal = document.getElementById('endTime').value;
+    if (startVal && endVal) {
+      const start = new Date(startVal);
+      const end = new Date(endVal);
+      if (!isNaN(start) && !isNaN(end) && end > start) {
+        const diffHours = (end - start) / (1000 * 60 * 60);
+        document.getElementById('hoursCount').value = Math.round(diffHours * 10) / 10;
+      }
+    }
+    recalculateAmount();
+  }
+
+  function recalculateAmount() {
+    const sId = document.getElementById('studentSelect').value;
+    const hours = Number(document.getElementById('hoursCount').value) || 0;
+    const rate = (sId && studentsMap[sId]) ? studentsMap[sId].rate : 100;
+    document.getElementById('totalAmount').value = Math.round(hours * rate);
+  }
+
+  async function saveLesson() {
+    const rowId = document.getElementById('editRowId').value;
+    const studentId = Number(document.getElementById('studentSelect').value);
+
+    if (!studentId) {
+      alert('Wybierz ucznia z listy!');
+      return;
+    }
+
+    const start = new Date(document.getElementById('startTime').value);
+    const end = new Date(document.getElementById('endTime').value);
+
+    const recordFields = {
+      StudentId: studentId,
+      LessonStartDateTime: Math.floor(start.getTime() / 1000),
+      LessonEndDateTime: Math.floor(end.getTime() / 1000),
+      LessonNotes: document.getElementById('lessonNotes').value,
+      IsCompleted: document.getElementById('isCompleted').checked,
+      IsPaid: document.getElementById('isPaid').checked,
+      PaymentType: document.getElementById('payType').value
+    };
+
+    try {
+      if (rowId) {
+        await grist.docApi.applyUserActions([['UpdateRecord', 'Lessons', Number(rowId), recordFields]]);
+      } else {
+        await grist.docApi.applyUserActions([['AddRecord', 'Lessons', null, recordFields]]);
+      }
+      closeModal();
+    } catch (e) {
+      alert('Błąd zapisu: ' + e.message);
+    }
+  }
+
+  async function deleteLesson() {
+    const rowId = document.getElementById('editRowId').value;
+    if (!rowId) return;
+
+    if (confirm('Czy na pewno chcesz usunąć tę lekcję?')) {
+      try {
+        await grist.docApi.applyUserActions([['RemoveRecord', 'Lessons', Number(rowId)]]);
+        closeModal();
+      } catch (e) {
+        alert('Błąd usuwania: ' + e.message);
+      }
+    }
+  }
+
+  async function updateEventTimes(event) {
+    await grist.docApi.applyUserActions([['UpdateRecord', 'Lessons', Number(event.id), {
+      LessonStartDateTime: Math.floor(event.start.getTime() / 1000),
+      LessonEndDateTime: Math.floor(event.end.getTime() / 1000)
+    }]]);
+  }
+</script>
+</body>
+</html>
