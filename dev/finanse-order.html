@@ -160,7 +160,6 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: var(--primary);
     }
 
     .table-card {
@@ -247,6 +246,7 @@
     </div>
   </div>
 
+  <!-- Dynamiczny pasek metod płatności -->
   <div class="split-card" id="splitContainer">
     <span style="color: var(--text-muted);">Ładowanie metod płatności...</span>
   </div>
@@ -299,7 +299,7 @@
         }
       }
     } catch (e) {
-      console.warn("Błąd odczytu PaymentMethods:", e);
+      console.warn("Błąd ładowania PaymentMethods:", e);
     }
   }
 
@@ -366,6 +366,7 @@
         totalUnpaid += amount;
       }
 
+      // Odczyt nazwy metody z obiektu relacji, mapy ID lub tekstu
       let methodName = 'Nieokreślono';
       const rawMethod = row.PaymentType;
 
@@ -374,7 +375,7 @@
           methodName = rawMethod.PaymentName || rawMethod.Name || 'Nieokreślono';
         } else if (paymentMethodsMap[rawMethod]) {
           methodName = paymentMethodsMap[rawMethod];
-        } else if (typeof rawMethod === 'string') {
+        } else if (typeof rawMethod === 'string' && isNaN(Number(rawMethod))) {
           methodName = rawMethod;
         }
       }
@@ -408,6 +409,7 @@
     document.getElementById('kpiPaidPct').textContent = `${paidPct}% przychodu`;
     document.getElementById('kpiUnpaidPct').textContent = `${unpaidPct}% zaległości`;
 
+    // Renderowanie dynamicznych pozycji metod płatności
     const splitContainer = document.getElementById('splitContainer');
     const methodKeys = Object.keys(dynamicSplits);
 
