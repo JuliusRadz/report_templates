@@ -160,6 +160,7 @@
       width: 10px;
       height: 10px;
       border-radius: 50%;
+      background: var(--primary);
     }
 
     .table-card {
@@ -246,19 +247,9 @@
     </div>
   </div>
 
-  <div class="split-card">
-    <div class="split-item">
-      <div class="split-dot" style="background: #1a73e8;"></div>
-      <span>Przelew: <strong id="splitTransfer">0,00 zł</strong></span>
-    </div>
-    <div class="split-item">
-      <div class="split-dot" style="background: #34a853;"></div>
-      <span>Gotówka: <strong id="splitCash">0,00 zł</strong></span>
-    </div>
-    <div class="split-item">
-      <div class="split-dot" style="background: #80868b;"></div>
-      <span>Nieokreślono: <strong id="splitOther">0,00 zł</strong></span>
-    </div>
+  <!-- Dynamiczny pasek podziału płatności -->
+  <div class="split-card" id="splitContainer">
+    <span style="color: var(--text-muted);">Ładowanie metod płatności...</span>
   </div>
 
   <div class="table-card">
@@ -294,6 +285,25 @@
   grist.ready({ requiredAccess: 'read table' });
 
   let allLessons = [];
+  let paymentMethodsMap = {};
+
+  const colors = ['#1a73e8', '#34a853', '#f9ab00', '#9334e6', '#e37400', '#0097a7', '#80868b'];
+
+  async function loadPaymentMethods() {
+    try {
+      const data = await grist.docApi.fetchTable('PaymentMethods');
+      paymentMethodsMap = {};
+      if (data && data.id && data.Name) {
+        for (let i = 0; i < data.id.length; i++) {
+          paymentMethodsMap[data.id[i]] = data.Name[i];
+        }
+      }
+    } catch (e) {
+      console.warn("Tabela PaymentMethods jeszcze nie istnieje lub używane jest pole Choice:", e);
+    }
+  }
+
+  loadPaymentMethods();
 
   function parseDate(val) {
     if (!val) return null;
@@ -330,10 +340,7 @@
     let totalHours = 0;
     let totalLessonsCount = 0;
 
-    let splitTransfer = 0;
-    let splitCash = 0;
-    let splitOther = 0;
-
+    const dynamicSplits = {};
     const studentSummary = {};
 
     allLessons.forEach(row => {
@@ -348,7 +355,6 @@
       const amount = Number(row.Amount) || 0;
       const hours = Number(row.Hours) || 0;
       const isPaid = Boolean(row.IsPaid);
-      const payType = String(row.PaymentType || '').toLowerCase().trim();
 
       totalRevenue += amount;
       totalHours += hours;
@@ -360,13 +366,21 @@
         totalUnpaid += amount;
       }
 
-      if (payType.includes('przelew')) {
-        splitTransfer += amount;
-      } else if (payType.includes('gotów') || payType.includes('gotow')) {
-        splitCash += amount;
-      } else {
-        splitOther += amount;
+      // Identyfikacja metody płatności (dla Reference lub Choice)
+      let methodName = 'Nieokreślono';
+      const rawMethod = row.PaymentType;
+
+      if (rawMethod) {
+        if (typeof rawMethod === 'object' && rawMethod.Name) {
+          methodName = rawMethod.Name;
+        } else if (paymentMethodsMap[rawMethod]) {
+          methodName = paymentMethodsMap[rawMethod];
+        } else if (typeof rawMethod === 'string') {
+          methodName = rawMethod;
+        }
       }
+
+      dynamicSplits[methodName] = (dynamicSplits[methodName] || 0) + amount;
 
       const studentName = row.FullNameText || row.StudentId || 'Nieprzypisany';
 
@@ -395,9 +409,25 @@
     document.getElementById('kpiPaidPct').textContent = `${paidPct}% przychodu`;
     document.getElementById('kpiUnpaidPct').textContent = `${unpaidPct}% zaległości`;
 
-    document.getElementById('splitTransfer').textContent = `${splitTransfer.toFixed(2)} zł`;
-    document.getElementById('splitCash').textContent = `${splitCash.toFixed(2)} zł`;
-    document.getElementById('splitOther').textContent = `${splitOther.toFixed(2)} zł`;
+    // Renderowanie podziału metod płatności
+    const splitContainer = document.getElementById('splitContainer');
+    const methodKeys = Object.keys(dynamicSplits);
+
+    if (methodKeys.length === 0) {
+      splitContainer.innerHTML = '<span>Brak danych płatności w wybranym okresie.</span>';
+    } else {
+      let splitHtml = '';
+      methodKeys.forEach((method, idx) => {
+        const dotColor = colors[idx % colors.length];
+        splitHtml += `
+          <div class="split-item">
+            <div class="split-dot" style="background: ${dotColor};"></div>
+            <span>${method}: <strong>${dynamicSplits[method].toFixed(2)} zł</strong></span>
+          </div>
+        `;
+      });
+      splitContainer.innerHTML = splitHtml;
+    }
 
     const tbody = document.getElementById('summaryBody');
     const studentNames = Object.keys(studentSummary);
@@ -429,8 +459,11 @@
     document.getElementById('footUnpaid').textContent = `${totalUnpaid.toFixed(2)} zł`;
   }
 
-  grist.onRecords((records) => {
+  grist.onRecords(async (records) => {
     allLessons = records || [];
+    if (Object.keys(paymentMethodsMap).length === 0) {
+      await loadPaymentMethods();
+    }
     renderDashboard();
   });
 </script>
