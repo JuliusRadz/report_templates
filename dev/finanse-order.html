@@ -247,7 +247,6 @@
     </div>
   </div>
 
-  <!-- Dynamiczny pasek podziału płatności -->
   <div class="split-card" id="splitContainer">
     <span style="color: var(--text-muted);">Ładowanie metod płatności...</span>
   </div>
@@ -293,13 +292,14 @@
     try {
       const data = await grist.docApi.fetchTable('PaymentMethods');
       paymentMethodsMap = {};
-      if (data && data.id && data.Name) {
+      const names = data.PaymentName || data.Name;
+      if (data && data.id && names) {
         for (let i = 0; i < data.id.length; i++) {
-          paymentMethodsMap[data.id[i]] = data.Name[i];
+          paymentMethodsMap[data.id[i]] = names[i];
         }
       }
     } catch (e) {
-      console.warn("Tabela PaymentMethods jeszcze nie istnieje lub używane jest pole Choice:", e);
+      console.warn("Błąd odczytu PaymentMethods:", e);
     }
   }
 
@@ -366,13 +366,12 @@
         totalUnpaid += amount;
       }
 
-      // Identyfikacja metody płatności (dla Reference lub Choice)
       let methodName = 'Nieokreślono';
       const rawMethod = row.PaymentType;
 
       if (rawMethod) {
-        if (typeof rawMethod === 'object' && rawMethod.Name) {
-          methodName = rawMethod.Name;
+        if (typeof rawMethod === 'object') {
+          methodName = rawMethod.PaymentName || rawMethod.Name || 'Nieokreślono';
         } else if (paymentMethodsMap[rawMethod]) {
           methodName = paymentMethodsMap[rawMethod];
         } else if (typeof rawMethod === 'string') {
@@ -409,7 +408,6 @@
     document.getElementById('kpiPaidPct').textContent = `${paidPct}% przychodu`;
     document.getElementById('kpiUnpaidPct').textContent = `${unpaidPct}% zaległości`;
 
-    // Renderowanie podziału metod płatności
     const splitContainer = document.getElementById('splitContainer');
     const methodKeys = Object.keys(dynamicSplits);
 
