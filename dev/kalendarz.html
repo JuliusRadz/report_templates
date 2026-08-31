@@ -284,9 +284,7 @@
       <div class="form-group">
         <label>Płatność</label>
         <select id="payType" class="form-control">
-          <option value="Gotówka">Gotówka</option>
-          <option value="Przelew">Przelew</option>
-          <option value="">Nieokreślono</option>
+          <option value="">-- Wybierz płatność --</option>
         </select>
       </div>
 
@@ -319,6 +317,8 @@
   let cachedRecords = null;
   let allStudents = [];
   let studentsMap = {};
+  let paymentMethods = [];
+  let paymentMethodsMap = {};
   let hasSetInitialDate = false;
 
   function toLocalISO(date) {
@@ -361,6 +361,34 @@
     }
   }
 
+  async function loadPaymentMethods() {
+    try {
+      const tableData = await grist.docApi.fetchTable('PaymentMethods');
+      paymentMethods = [];
+      paymentMethodsMap = {};
+
+      const count = tableData.id.length;
+      for (let i = 0; i < count; i++) {
+        const method = {
+          id: tableData.id[i],
+          name: tableData.Name[i],
+          active: tableData.IsActive ? Boolean(tableData.IsActive[i]) : true
+        };
+        paymentMethods.push(method);
+        paymentMethodsMap[method.id] = method;
+        paymentMethodsMap[method.name.trim()] = method;
+      }
+      populatePaymentSelect();
+    } catch (e) {
+      // Fallback jeśli kolumna pozostała polem tekstowym/Choice
+      paymentMethods = [
+        { id: 'Przelew', name: 'Przelew', active: true },
+        { id: 'Gotówka', name: 'Gotówka', active: true }
+      ];
+      populatePaymentSelect();
+    }
+  }
+
   function populateStudentSelect(selectedStudentId = null) {
     const select = document.getElementById('studentSelect');
     select.innerHTML = '<option value="">-- Wybierz ucznia --</option>';
@@ -376,6 +404,24 @@
 
     if (selectedStudentId) {
       select.value = String(selectedStudentId);
+    }
+  }
+
+  function populatePaymentSelect(selectedPaymentId = null) {
+    const select = document.getElementById('payType');
+    select.innerHTML = '<option value="">-- Nieokreślono --</option>';
+
+    paymentMethods.forEach(pm => {
+      if (pm.active || (selectedPaymentId && String(selectedPaymentId) === String(pm.id))) {
+        const opt = document.createElement('option');
+        opt.value = pm.id;
+        opt.textContent = pm.name;
+        select.appendChild(opt);
+      }
+    });
+
+    if (selectedPaymentId) {
+      select.value = String(selectedPaymentId);
     }
   }
 
@@ -436,6 +482,7 @@
   document.addEventListener('DOMContentLoaded', async () => {
     grist.ready({ requiredAccess: 'full' });
     await loadStudents();
+    await loadPaymentMethods();
 
     const isMobile = window.innerWidth < 768;
     const calendarEl = document.getElementById('calendar');
@@ -503,13 +550,13 @@
     document.getElementById('btnDelete').style.display = 'none';
 
     populateStudentSelect();
+    populatePaymentSelect();
     document.getElementById('studentSelect').value = '';
     document.getElementById('startTime').value = toLocalISO(start);
     document.getElementById('endTime').value = toLocalISO(end);
     document.getElementById('lessonNotes').value = '';
     document.getElementById('isCompleted').checked = false;
     document.getElementById('isPaid').checked = false;
-    document.getElementById('payType').value = 'Gotówka';
 
     recalculateHours();
     document.getElementById('eventModal').classList.add('active');
@@ -532,14 +579,24 @@
       matchedStudentId = studentsMap[row.FullNameText.trim()].id;
     }
 
+    let matchedPaymentId = '';
+    const pRaw = row.PaymentType;
+    if (typeof pRaw === 'object' && pRaw !== null && pRaw.id) {
+      matchedPaymentId = pRaw.id;
+    } else if (paymentMethodsMap[pRaw]) {
+      matchedPaymentId = paymentMethodsMap[pRaw].id;
+    } else {
+      matchedPaymentId = pRaw || '';
+    }
+
     populateStudentSelect(matchedStudentId);
+    populatePaymentSelect(matchedPaymentId);
 
     document.getElementById('startTime').value = toLocalISO(event.start);
     document.getElementById('endTime').value = toLocalISO(event.end);
     document.getElementById('lessonNotes').value = row.LessonNotes || '';
     document.getElementById('isCompleted').checked = Boolean(row.IsCompleted);
     document.getElementById('isPaid').checked = Boolean(row.IsPaid);
-    document.getElementById('payType').value = row.PaymentType || 'Gotówka';
 
     recalculateHours();
     document.getElementById('eventModal').classList.add('active');
@@ -577,6 +634,7 @@
   async function saveLesson() {
     const rowId = document.getElementById('editRowId').value;
     const studentId = Number(document.getElementById('studentSelect').value);
+    const payVal = document.getElementById('payType').value;
 
     if (!studentId) {
       alert('Wybierz ucznia z listy!');
@@ -586,6 +644,9 @@
     const start = new Date(document.getElementById('startTime').value);
     const end = new Date(document.getElementById('endTime').value);
 
+    // Jeśli payVal jest liczbą (ID z tabeli), konwertujemy na Number, w przeciwnym razie zapisujemy string/null
+    const paymentFieldValue = payVal ? (isNaN(Number(payVal)) ? payVal : Number(payVal)) : null;
+
     const recordFields = {
       StudentId: studentId,
       LessonStartDateTime: Math.floor(start.getTime() / 1000),
@@ -593,7 +654,7 @@
       LessonNotes: document.getElementById('lessonNotes').value,
       IsCompleted: document.getElementById('isCompleted').checked,
       IsPaid: document.getElementById('isPaid').checked,
-      PaymentType: document.getElementById('payType').value
+      PaymentType: paymentFieldValue
     };
 
     try {
