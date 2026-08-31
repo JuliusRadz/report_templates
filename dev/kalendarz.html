@@ -368,12 +368,13 @@
       paymentMethodsMap = {};
 
       const count = tableData.id.length;
+      // Pobieranie PaymentName (zabezpieczenie fallbackiem do Name)
       const names = tableData.PaymentName || tableData.Name;
 
       for (let i = 0; i < count; i++) {
         const method = {
           id: tableData.id[i],
-          name: names ? names[i] : 'Metoda ' + tableData.id[i],
+          name: names ? names[i] : 'Metoda #' + tableData.id[i],
           active: tableData.IsActive ? Boolean(tableData.IsActive[i]) : true
         };
         paymentMethods.push(method);
@@ -382,7 +383,7 @@
       }
       populatePaymentSelect();
     } catch (e) {
-      console.warn("Błąd ładowania PaymentMethods:", e);
+      console.error("Błąd ładowania tabeli PaymentMethods:", e);
     }
   }
 
@@ -406,7 +407,7 @@
 
   function populatePaymentSelect(selectedPaymentId = null) {
     const select = document.getElementById('payType');
-    select.innerHTML = '<option value="">-- Nieokreślono --</option>';
+    select.innerHTML = '<option value="">-- Wybierz płatność --</option>';
 
     paymentMethods.forEach(pm => {
       if (pm.active || (selectedPaymentId && String(selectedPaymentId) === String(pm.id))) {
@@ -641,7 +642,8 @@
     const start = new Date(document.getElementById('startTime').value);
     const end = new Date(document.getElementById('endTime').value);
 
-    const paymentFieldValue = payVal ? (isNaN(Number(payVal)) ? payVal : Number(payVal)) : null;
+    // Przekształcamy wybrane ID metody płatności na liczbę dla typu Reference
+    const paymentRefId = payVal ? Number(payVal) : null;
 
     const recordFields = {
       StudentId: studentId,
@@ -650,7 +652,7 @@
       LessonNotes: document.getElementById('lessonNotes').value,
       IsCompleted: document.getElementById('isCompleted').checked,
       IsPaid: document.getElementById('isPaid').checked,
-      PaymentType: paymentFieldValue
+      PaymentType: paymentRefId
     };
 
     try {
