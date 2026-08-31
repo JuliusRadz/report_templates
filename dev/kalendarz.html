@@ -368,10 +368,12 @@
       paymentMethodsMap = {};
 
       const count = tableData.id.length;
+      const names = tableData.PaymentName || tableData.Name;
+
       for (let i = 0; i < count; i++) {
         const method = {
           id: tableData.id[i],
-          name: tableData.Name[i],
+          name: names ? names[i] : 'Metoda ' + tableData.id[i],
           active: tableData.IsActive ? Boolean(tableData.IsActive[i]) : true
         };
         paymentMethods.push(method);
@@ -380,12 +382,7 @@
       }
       populatePaymentSelect();
     } catch (e) {
-      // Fallback jeśli kolumna pozostała polem tekstowym/Choice
-      paymentMethods = [
-        { id: 'Przelew', name: 'Przelew', active: true },
-        { id: 'Gotówka', name: 'Gotówka', active: true }
-      ];
-      populatePaymentSelect();
+      console.warn("Błąd ładowania PaymentMethods:", e);
     }
   }
 
@@ -644,7 +641,6 @@
     const start = new Date(document.getElementById('startTime').value);
     const end = new Date(document.getElementById('endTime').value);
 
-    // Jeśli payVal jest liczbą (ID z tabeli), konwertujemy na Number, w przeciwnym razie zapisujemy string/null
     const paymentFieldValue = payVal ? (isNaN(Number(payVal)) ? payVal : Number(payVal)) : null;
 
     const recordFields = {
