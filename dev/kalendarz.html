@@ -276,8 +276,8 @@
           <input type="number" step="0.5" id="hoursCount" class="form-control" readonly style="opacity: 0.65;">
         </div>
         <div class="form-group">
-          <label>Kwota (auto)</label>
-          <input type="number" id="totalAmount" class="form-control" readonly style="opacity: 0.65;">
+          <label>Kwota (zł)</label>
+          <input type="number" step="0.01" id="totalAmount" class="form-control">
         </div>
       </div>
 
@@ -368,7 +368,6 @@
       paymentMethodsMap = {};
 
       const count = tableData.id.length;
-      // Pobieranie PaymentName (zabezpieczenie fallbackiem do Name)
       const names = tableData.PaymentName || tableData.Name;
 
       for (let i = 0; i < count; i++) {
@@ -597,6 +596,11 @@
     document.getElementById('isPaid').checked = Boolean(row.IsPaid);
 
     recalculateHours();
+
+    if (row.Amount !== undefined && row.Amount !== null) {
+      document.getElementById('totalAmount').value = row.Amount;
+    }
+
     document.getElementById('eventModal').classList.add('active');
   }
 
@@ -641,14 +645,13 @@
 
     const start = new Date(document.getElementById('startTime').value);
     const end = new Date(document.getElementById('endTime').value);
-
-    // Przekształcamy wybrane ID metody płatności na liczbę dla typu Reference
     const paymentRefId = payVal ? Number(payVal) : null;
 
     const recordFields = {
       StudentId: studentId,
       LessonStartDateTime: Math.floor(start.getTime() / 1000),
       LessonEndDateTime: Math.floor(end.getTime() / 1000),
+      Amount: Number(document.getElementById('totalAmount').value) || 0,
       LessonNotes: document.getElementById('lessonNotes').value,
       IsCompleted: document.getElementById('isCompleted').checked,
       IsPaid: document.getElementById('isPaid').checked,
