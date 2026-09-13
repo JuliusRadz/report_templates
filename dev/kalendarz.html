@@ -347,7 +347,7 @@
         const student = {
           id: tableData.id[i],
           name: tableData.FullName[i],
-          rate: Number(tableData.HourlyRate ? tableData.HourlyRate[i] : 100) || 100,
+          rate: Number(tableData.BaseRate ? tableData.BaseRate[i] : 100) || 100,
           active: Boolean(tableData.IsActive[i])
         };
 
@@ -394,7 +394,7 @@
       if (st.active || (selectedStudentId && Number(selectedStudentId) === Number(st.id))) {
         const opt = document.createElement('option');
         opt.value = st.id;
-        opt.textContent = `${st.name} (${st.rate} zł/h)${!st.active ? ' [Nieaktywny]' : ''}`;
+        opt.textContent = `${st.name} (${st.rate} zł)${!st.active ? ' [Nieaktywny]' : ''}`;
         select.appendChild(opt);
       }
     });
@@ -551,6 +551,9 @@
     document.getElementById('studentSelect').value = '';
     document.getElementById('startTime').value = toLocalISO(start);
     document.getElementById('endTime').value = toLocalISO(end);
+    
+    document.getElementById('totalAmount').value = '';
+    
     document.getElementById('lessonNotes').value = '';
     document.getElementById('isCompleted').checked = false;
     document.getElementById('isPaid').checked = false;
@@ -623,14 +626,16 @@
         document.getElementById('hoursCount').value = Math.round(diffHours * 10) / 10;
       }
     }
-    recalculateAmount();
   }
 
   function recalculateAmount() {
     const sId = document.getElementById('studentSelect').value;
-    const hours = Number(document.getElementById('hoursCount').value) || 0;
-    const rate = (sId && studentsMap[sId]) ? studentsMap[sId].rate : 100;
-    document.getElementById('totalAmount').value = Math.round(hours * rate);
+    
+    if (sId && studentsMap[sId]) {
+      document.getElementById('totalAmount').value = studentsMap[sId].rate;
+    } else {
+      document.getElementById('totalAmount').value = '';
+    }
   }
 
   async function saveLesson() {
