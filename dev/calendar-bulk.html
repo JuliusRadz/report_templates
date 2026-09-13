@@ -251,7 +251,6 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="editRowId" value="">
-      <input type="hidden" id="editSeriesId" value="">
 
       <div class="form-group">
         <label>Uczeń</label>
@@ -554,7 +553,6 @@
 
   function openModalForNew(start, end) {
     document.getElementById('editRowId').value = '';
-    document.getElementById('editSeriesId').value = '';
     document.getElementById('modalTitle').textContent = 'Zaplanuj lekcję';
     document.getElementById('btnDelete').style.display = 'none';
 
@@ -578,7 +576,6 @@
   function openModalForEdit(event) {
     const row = event.extendedProps.raw;
     document.getElementById('editRowId').value = row.id;
-    document.getElementById('editSeriesId').value = row.SeriesId || '';
     document.getElementById('modalTitle').textContent = 'Edytuj lekcję';
     document.getElementById('btnDelete').style.display = 'block';
 
@@ -718,39 +715,43 @@
 
   async function deleteLesson() {
     const rowId = Number(document.getElementById('editRowId').value);
-    const seriesId = document.getElementById('editSeriesId').value;
     if (!rowId) return;
 
-    if (confirm('Czy na pewno chcesz usunąć tę lekcję?')) {
-      if (seriesId) {
-        const deleteWholeSeries = confirm(
-          "UWAGA: Ta lekcja jest częścią powtarzającego się cyklu.\n\n" +
-          "Czy chcesz usunąć WSZYSTKIE lekcje z tego cyklu?\n" +
-          "[OK] - Usuń cały cykl\n" +
-          "[Anuluj] - Usuń TYLKO tę jedną lekcję"
-        );
+    const lessonRecord = cachedRecords.find(r => r.id === rowId);
+    const seriesId = lessonRecord ? lessonRecord.SeriesId : null;
 
-        try {
-          if (deleteWholeSeries) {
-            const idsToDelete = cachedRecords
-              .filter(r => r.SeriesId === seriesId)
-              .map(r => r.id);
-            const actions = idsToDelete.map(id => ['RemoveRecord', 'Lessons', id]);
-            await grist.docApi.applyUserActions(actions);
-          } else {
-            await grist.docApi.applyUserActions([['RemoveRecord', 'Lessons', rowId]]);
-          }
-          closeModal();
-        } catch (e) {
-          alert('Błąd usuwania cyklu: ' + e.message);
-        }
-      } else {
-        try {
+    if (!confirm('Czy na pewno chcesz usunąć?')) {
+      return; 
+    }
+
+    if (seriesId) {
+      const deleteWholeSeries = confirm(
+        "UWAGA: Ta lekcja jest częścią powtarzającego się cyklu.\n\n" +
+        "Kliknij [ OK ], aby usunąć CAŁY CYKL (wszystkie powiązane lekcje).\n" +
+        "Kliknij [ ANULUJ ], aby usunąć TYLKO TĘ JEDNĄ lekcję."
+      );
+
+      try {
+        if (deleteWholeSeries) {
+          const idsToDelete = cachedRecords
+            .filter(r => r.SeriesId === seriesId)
+            .map(r => r.id);
+          
+          const actions = idsToDelete.map(id => ['RemoveRecord', 'Lessons', id]);
+          await grist.docApi.applyUserActions(actions);
+        } else {
           await grist.docApi.applyUserActions([['RemoveRecord', 'Lessons', rowId]]);
-          closeModal();
-        } catch (e) {
-          alert('Błąd usuwania: ' + e.message);
         }
+        closeModal();
+      } catch (e) {
+        alert('Błąd usuwania cyklu: ' + e.message);
+      }
+    } else {
+      try {
+        await grist.docApi.applyUserActions([['RemoveRecord', 'Lessons', rowId]]);
+        closeModal();
+      } catch (e) {
+        alert('Błąd usuwania: ' + e.message);
       }
     }
   }
